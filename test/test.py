@@ -25,6 +25,20 @@ def test_alu():
     )
 
 
+def test_multiplier():
+    simulator.run(
+        verilog_sources=[
+            f"{SRC_DIR}/cpu/alu.v",
+            f"{TEST_DIR}/unit/alu/tb_multiplier.v",
+        ],
+        toplevel="tb_multiplier",
+        module="unit.alu.test_multiplier",
+        simulator="icarus",
+        work_dir=f"{TEST_DIR}/sim_build/multiplier",
+        python_search=[str(TEST_DIR)],
+    )
+
+
 def test_registers():
     simulator.run(
         verilog_sources=[
