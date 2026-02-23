@@ -26,6 +26,17 @@ wheels = [
 ]
 
 [[package]]
+name = "cocotb-test"
+version = "0.2.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cocotb" },
+    { name = "find-libpython" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cd/49/2d00e3518fcff0abc4c15207b1d14745420c6b4b4c7ece60d5c35717842e/cocotb_test-0.2.6.tar.gz", hash = "sha256:a4661948ca145eee6bccaf832174b5efb9f6d3420677157c04ade72bb2160692", size = 21254, upload-time = "2025-01-04T15:42:34.136Z" }
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -187,6 +198,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "cocotb" },
+    { name = "cocotb-test" },
     { name = "numpy" },
     { name = "pytest" },
 ]
@@ -199,6 +211,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "cocotb", specifier = ">=2.0.1" },
+    { name = "cocotb-test", specifier = ">=0.2.6" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "pytest", specifier = ">=9.0.2" },
 ]
