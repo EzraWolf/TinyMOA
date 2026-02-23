@@ -105,7 +105,7 @@
 */
 
 
-module tinymoa_decode #(parameter REG_ADDR_WIDTH = 4) (
+module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
     input [31:0] instr,
 
     output reg [31:0] imm,
