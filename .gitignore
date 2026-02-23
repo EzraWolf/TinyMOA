@@ -1,7 +1,21 @@
+
+# General
 .DS_Store
 *.bin
 *.hex
 *.map
 *.o
-*.asc
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# FPGA
 top*.json
+*.blif
+*.asc

@@ -1,0 +1,20 @@
+# Cocotb test results
+results.xml
+
+# Waveform files
+*.fst
+*.vcd
+*.ghw
+
+# Simulation build directory
+sim_build/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage
+.coverage
+htmlcov/
