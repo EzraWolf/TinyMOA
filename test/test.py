@@ -25,6 +25,20 @@ def test_registers():
     )
 
 
+def test_counter():
+    simulator.run(
+        verilog_sources=[
+            f"{SRC_DIR}/cpu/registers.v",
+            f"{TEST_DIR}/unit/registers/tb_counter.v",
+        ],
+        toplevel="tb_counter",
+        module="unit.registers.tb_counter",
+        simulator="icarus",
+        work_dir=f"{TEST_DIR}/sim_build/counter",
+        python_search=[str(TEST_DIR)],
+    )
+
+
 def test_main_design():
     simulator.run(
         verilog_sources=[
