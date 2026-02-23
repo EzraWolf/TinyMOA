@@ -10,7 +10,7 @@ module tinymoa_register_file #(parameter REG_COUNT = 16) (
     input [2:0]  nibble_counter,
 
     input        write_en,
-    input [4:0]  write_dest,  // rd writeback addr
+    input [3:0]  write_dest,  // rd writeback addr (4 bits for RV32E)
     input [3:0]  data_in,     // data to write to write_dest (rd)
 
     input [3:0]  read_addr_a, // rs1 (port A)
