@@ -23,8 +23,8 @@ module tb_decoder (
 
     output [2:0] instr_len,
 
-    output [3:0] alu_op,
-    output [2:0] mem_op,
+    output [3:0] alu_opcode,
+    output [2:0] mem_opcode,
 
     output [3:0] rs1,
     output [3:0] rs2,
@@ -60,8 +60,8 @@ module tb_decoder (
 
         .instr_len(instr_len[2:1]),
 
-        .alu_opcode(alu_op),
-        .mem_opcode(mem_op),
+        .alu_opcode(alu_opcode),
+        .mem_opcode(mem_opcode),
 
         .read_addr_a(rs1),
         .read_addr_b(rs2),

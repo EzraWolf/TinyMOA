@@ -124,6 +124,8 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
 
     output reg is_auipc,
 
+    output reg is_compressed,
+
     output [2:1] instr_len,
 
     output reg [3:0] alu_opcode,
@@ -139,50 +141,59 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
 
     assign instr_len = (instr[1:0] == 2'b11) ? 2'b10 : 2'b01;
 
-    // 32-bit immediates
-    wire [31:0] Uimm = {    instr[31],   instr[30:12], {12{1'b0}}};
-    wire [31:0] Iimm = {{21{instr[31]}}, instr[30:20]};
-    wire [31:0] Simm = {{21{instr[31]}}, instr[30:25],instr[11:7]};
-    wire [31:0] Bimm = {{20{instr[31]}}, instr[7],instr[30:25],instr[11:8],1'b0};
-    wire [31:0] Jimm = {{12{instr[31]}}, instr[19:12],instr[20],instr[30:21],1'b0};
+    // 32b base immediates
+    wire [31:0] u_imm = {    instr[31],   instr[30:12], {12{1'b0}}};
+    wire [31:0] i_imm = {{21{instr[31]}}, instr[30:20]};
+    wire [31:0] s_imm = {{21{instr[31]}}, instr[30:25],instr[11:7]};
+    wire [31:0] b_imm = {{20{instr[31]}}, instr[7],instr[30:25],instr[11:8],1'b0};
+    wire [31:0] j_imm = {{12{instr[31]}}, instr[19:12],instr[20],instr[30:21],1'b0};
 
-    // Compressed immediates
-    wire [31:0] CLWSPimm     = {24'b0, instr[3:2], instr[12], instr[6:4], 2'b00};
-    wire [31:0] CSWSPimm     = {24'b0, instr[8:7], instr[12:9], 2'b00};
-    wire [31:0] CLSWimm      = {25'b0, instr[5], instr[12:10], instr[6], 2'b00};  // LW and SW
-    wire [31:0] CLSHimm      = {30'b0, instr[5], 1'b0};  // LH(U) and SH
-    wire [31:0] CLSBimm      = {30'b0, instr[5], instr[6]};  // LBU and SB
-    wire [31:0] CJimm        = {{21{instr[12]}}, instr[8], instr[10:9], instr[6], instr[7], instr[2], instr[11], instr[5:3], 1'b0};
-    wire [31:0] CBimm        = {{24{instr[12]}}, instr[6:5], instr[2], instr[11:10], instr[4:3], 1'b0};
-    wire [31:0] CALUimm      = {{27{instr[12]}}, instr[6:2]};          // ADDI, LI, shifts, ANDI
-    wire [31:0] CLUIimm      = {{15{instr[12]}}, instr[6:2], 12'b0};
-    wire [31:0] CADDI16SPimm = {{23{instr[12]}}, instr[4:3], instr[5], instr[2], instr[6], 4'b0};
-    wire [31:0] CADDI4SPimm  = {22'b0, instr[10:7], instr[12:11], instr[5], instr[6], 2'b0};
-    wire [31:0] CSCXTimm     = {{23{instr[12]}}, instr[9:7], instr[10], instr[11], 4'b0};
+    // TODO: Convert to purely 16b so go from 8 cycles/instruction to 4 cycles.
+    // 16b compressed immediates
+    wire [31:0] c_lwsp_imm     = {24'b0, instr[3:2], instr[12], instr[6:4], 2'b00};
+    wire [31:0] c_swsp_imm     = {24'b0, instr[8:7], instr[12:9], 2'b00};
+    wire [31:0] c_lsw_imm      = {25'b0, instr[5], instr[12:10], instr[6], 2'b00};  // LW and SW
+    wire [31:0] c_lsh_imm      = {30'b0, instr[5], 1'b0};  // LH(U) and SH
+    wire [31:0] c_lsb_imm      = {30'b0, instr[5], instr[6]};  // LBU and SB
+    wire [31:0] c_j_imm        = {{21{instr[12]}}, instr[8], instr[10:9], instr[6], instr[7], instr[2], instr[11], instr[5:3], 1'b0};
+    wire [31:0] c_b_imm        = {{24{instr[12]}}, instr[6:5], instr[2], instr[11:10], instr[4:3], 1'b0};
+    wire [31:0] c_alu_imm      = {{27{instr[12]}}, instr[6:2]};          // ADDI, LI, shifts, ANDI
+    wire [31:0] c_lui_imm      = {{15{instr[12]}}, instr[6:2], 12'b0};
+    wire [31:0] c_addi16sp_imm = {{23{instr[12]}}, instr[4:3], instr[5], instr[2], instr[6], 4'b0};
+    wire [31:0] c_addi4sp_imm  = {22'b0, instr[10:7], instr[12:11], instr[5], instr[6], 2'b0};
+    wire [31:0] c_scxt_imm     = {{23{instr[12]}}, instr[9:7], instr[10], instr[11], 4'b0};
 
+    // Quadrant detection for compressed instructions
+    wire [1:0] c_quadrant = instr[1:0];
+    wire [2:0] c_funct3 = instr[15:13];
+    
     always @(*) begin
         additional_mem_opcode = 3'b000;
         mem_op_increment_reg = 1;
         is_ret = 0;
+        is_compressed = 0;
 
+        // ================================================================
+        // 32-bit Base Instructions (8 cycles @ 4-bit/cycle)
+        // ================================================================
         if (instr[1:0] == 2'b11) begin
-            is_load    =  (instr[6:2] == 5'b00000); // rd <- mem[rs1+Iimm]
-            is_alu_imm =  (instr[6:2] == 5'b00100); // rd <- rs1 OP Iimm
-            is_auipc   =  (instr[6:2] == 5'b00101); // rd <- PC + Uimm
-            is_store   =  (instr[6:2] == 5'b01000); // mem[rs1+Simm] <- rs2
+            is_load    =  (instr[6:2] == 5'b00000); // rd <- mem[rs1+i_imm]
+            is_alu_imm =  (instr[6:2] == 5'b00100); // rd <- rs1 OP i_imm
+            is_auipc   =  (instr[6:2] == 5'b00101); // rd <- PC + u_imm
+            is_store   =  (instr[6:2] == 5'b01000); // mem[rs1+s_imm] <- rs2
             is_alu_reg =  (instr[6:2] == 5'b01100); // rd <- rs1 OP rs2
-            is_lui     =  (instr[6:2] == 5'b01101); // rd <- Uimm
-            is_branch  =  (instr[6:2] == 5'b11000); // if(rs1 OP rs2) PC<-PC+Bimm
-            is_jalr    =  (instr[6:2] == 5'b11001); // rd <- PC+4; PC<-rs1+Iimm
-            is_jal     =  (instr[6:2] == 5'b11011); // rd <- PC+4; PC<-PC+Jimm
+            is_lui     =  (instr[6:2] == 5'b01101); // rd <- u_imm
+            is_branch  =  (instr[6:2] == 5'b11000); // if(rs1 OP rs2) PC<-PC+b_imm
+            is_jalr    =  (instr[6:2] == 5'b11001); // rd <- PC+4; PC<-rs1+i_imm
+            is_jal     =  (instr[6:2] == 5'b11011); // rd <- PC+4; PC<-PC+j_imm
             is_system  =  (instr[6:2] == 5'b11100); // rd <- csr - NYI
 
-            // Determine immediate.  Hopefully muxing here is reasonable.
-            if (is_auipc || is_lui) imm = Uimm;
-            else if (is_store) imm = Simm;
-            else if (is_branch) imm = Bimm;
-            else if (is_jal) imm = Jimm;
-            else imm = Iimm;
+            // Determine immediate. Hopefully muxing here is reasonable.
+            if (is_auipc || is_lui) imm = u_imm;
+            else if (is_store) imm = s_imm;
+            else if (is_branch) imm = b_imm;
+            else if (is_jal) imm = j_imm;
+            else imm = i_imm;
 
             // Determine alu op
             if (is_load || is_auipc || is_store || is_jalr || is_jal) alu_opcode = 4'b0000;  // ADD
@@ -206,17 +217,22 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
             read_addr_a = instr[15+:REG_ADDR_WIDTH];
             read_addr_b = instr[20+:REG_ADDR_WIDTH];
             write_dest  = instr[ 7+:REG_ADDR_WIDTH];
+        
+        // ================================================================
+        // 16-bit Compressed Instructions (4 cycles @ 4-bit/cycle)
+        // ================================================================
         end else begin
-            is_load    = 0;
-            is_alu_imm = 0;
-            is_auipc   = 0;
-            is_store   = 0;
-            is_alu_reg = 0;
-            is_lui     = 0;
-            is_branch  = 0;
-            is_jalr    = 0;
-            is_jal     = 0;
-            is_system  = 0;
+            is_compressed = 1;
+            is_load         = 0;
+            is_alu_imm      = 0;
+            is_auipc        = 0;
+            is_store        = 0;
+            is_alu_reg      = 0;
+            is_lui          = 0;
+            is_branch       = 0;
+            is_jalr         = 0;
+            is_jal          = 0;
+            is_system       = 0;
             imm = {32{1'bx}};
             alu_opcode = 4'b0000;
             mem_opcode = 3'bxxx;
@@ -224,22 +240,25 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
             read_addr_b = {REG_ADDR_WIDTH{1'bx}};
             write_dest = {REG_ADDR_WIDTH{1'bx}};
 
-            case ({instr[1:0], instr[15:13]})
-                5'b00000: begin // ADDI4SPN 
+            case ({c_quadrant, c_funct3})
+                // ============================================================
+                // Quadrant 00 - Loads, Stores, and Stack Operations
+                // ============================================================
+                5'b00000: begin // C.ADDI4SPN (CIW-Type) 
                     is_alu_imm = 1;
-                    imm = CADDI4SPimm;
+                    imm = c_addi4sp_imm;
                     read_addr_a = 4'd2;
                     write_dest  = {1'b1, instr[4:2]};
                 end
                 5'b00010: begin // LW
                     is_load = 1;
                     mem_opcode = 3'b010;
-                    imm = CLSWimm;
+                    imm = c_lsw_imm;
                     read_addr_a = {1'b1, instr[9:7]};
                     write_dest  = {1'b1, instr[4:2]};
                 end 
                 5'b00100: begin // Load/store byte or halfword
-                    imm = instr[10] ? CLSHimm : CLSBimm;
+                    imm = instr[10] ? c_lsh_imm : c_lsb_imm;
                     read_addr_a = {1'b1, instr[9:7]};
                     if (instr[11]) begin
                         is_store = 1;
@@ -254,51 +273,55 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                 5'b00110: begin // SW
                     is_store = 1;
                     mem_opcode = 3'b010;
-                    imm = CLSWimm;
+                    imm = c_lsw_imm;
                     read_addr_a = {1'b1, instr[9:7]};
                     read_addr_b = {1'b1, instr[4:2]};
                 end
                 5'b00111: begin // SCXT: Store rs2[2:0]+1 contiguous registers starting at {rs2[4:3], 3'b001}
                     is_store = 1;    //  from address imm(gp) (imm is a sign-extended 6-bit immediate multiplied by 16)
                     mem_opcode = 3'b010;
-                    imm = CSCXTimm;
+                    imm = c_scxt_imm;
                     read_addr_a = 4'd3;
                     read_addr_b = {instr[5], 3'b001};
                     additional_mem_opcode = instr[4:2];
                 end
-                5'b01000: begin // ADDI
+                
+                // ============================================================
+                // Quadrant 01 - ALU, Control Flow, and Immediates
+                // ============================================================
+                5'b01000: begin // C.ADDI (CI-Type)
                     is_alu_imm = 1;
-                    imm = CALUimm;
-                    read_addr_a = instr[10:7];
-                    write_dest  = instr[10:7];
+                    imm = c_alu_imm;
+                    read_addr_a = instr[11:7];
+                    write_dest  = instr[11:7];
                 end
                 5'b01001: begin // JAL
                     is_jal = 1;
-                    imm = CJimm;
+                    imm = c_j_imm;
                     write_dest  = 4'd1;
                 end
                 5'b01010: begin // LI
                     is_alu_imm = 1;
-                    imm = CALUimm;
+                    imm = c_alu_imm;
                     read_addr_a = 4'd0;
-                    write_dest  = instr[10:7];
+                    write_dest  = instr[11:7];
                 end
                 5'b01011: begin // ADDI16SP/LUI
-                    write_dest  = instr[10:7];
-                    if (instr[10:7] == 4'd2) begin
+                    write_dest  = instr[11:7];
+                    if (instr[11:7] == 4'd2) begin
                         is_alu_imm = 1;
-                        imm = CADDI16SPimm;
+                        imm = c_addi16sp_imm;
                         read_addr_a = 4'd2;
                     end else begin
                         is_lui = 1;
-                        imm = CLUIimm;
+                        imm = c_lui_imm;
                     end
                 end
                 5'b01100: begin // ALU
                     read_addr_a = {1'b1, instr[9:7]};
                     read_addr_b = {1'b1, instr[4:2]};
                     write_dest  = {1'b1, instr[9:7]};
-                    imm = CALUimm;
+                    imm = c_alu_imm;
                     if (instr[11:10] != 2'b11) begin
                         is_alu_imm = 1;
                         if (instr[11] == 1'b0) begin // SRx
@@ -331,12 +354,12 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                 end
                 5'b01101: begin // J
                     is_jal = 1;
-                    imm = CJimm;
+                    imm = c_j_imm;
                     write_dest  = 4'd0;
                 end                
                 5'b01110: begin // BEQZ
                     is_branch = 1;
-                    imm = CBimm;
+                    imm = c_b_imm;
                     read_addr_a = {1'b1, instr[9:7]};
                     read_addr_b = 4'd0;
                     alu_opcode = 4'b0100;
@@ -344,23 +367,27 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                 end    
                 5'b01111: begin // BNEZ
                     is_branch = 1;
-                    imm = CBimm;
+                    imm = c_b_imm;
                     read_addr_a = {1'b1, instr[9:7]};
                     read_addr_b = 4'd0;
                     alu_opcode = 4'b0100;
                     mem_opcode = 3'b001;
                 end
-                5'b10000: begin // SLLI
+                
+                // ============================================================
+                // Quadrant 10 - Stack-relative, Register Ops, and Jumps  
+                // ============================================================
+                5'b10000: begin // C.SLLI (CI-Type)
                     is_alu_imm = 1;
-                    imm = CALUimm;
-                    read_addr_a = instr[10:7];
-                    write_dest  = instr[10:7];
+                    imm = c_alu_imm;
+                    read_addr_a = instr[11:7];
+                    write_dest  = instr[11:7];
                     alu_opcode = 4'b0001;
                 end
                 5'b10001: begin // LCXT: Load rd[2:0]+1 contiguous registers starting at {rd[4:3], 3'b001}
                     is_load = 1;     //  from address imm(gp) (imm is a sign-extended 6-bit immediate multiplied by 16)
                     mem_opcode = 3'b010;
-                    imm = CADDI16SPimm;
+                    imm = c_addi16sp_imm;
                     read_addr_a = 4'd3;
                     write_dest  = {instr[10], 3'b001};
                     additional_mem_opcode = instr[9:7];
@@ -368,56 +395,61 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                 5'b10010: begin // LWSP
                     is_load = 1;
                     mem_opcode = 3'b010;
-                    imm = CLWSPimm;
+                    imm = c_lwsp_imm;
                     read_addr_a = 4'd2;
-                    write_dest  = instr[10:7];
+                    write_dest  = instr[11:7];
                 end
                 5'b10011: begin // LWTP
                     is_load = 1;
                     mem_opcode = 3'b010;
-                    imm = CLWSPimm;
+                    imm = c_lwsp_imm;
                     read_addr_a = 4'd4;
-                    write_dest  = instr[10:7];
+                    write_dest  = instr[11:7];
                 end
                 5'b10100: begin 
-                    if (instr[6:2] == 0) begin
+                    if (instr[12]) begin  // C.ADD: bit 12 = 1
+                        is_alu_reg = 1;
+                        read_addr_a = instr[11:7];
+                        read_addr_b = instr[6:2];
+                        write_dest  = instr[11:7];
+                    end else if (instr[6:2] == 0) begin  // JALR or EBREAK: bit 12 = 0, rs2 = 0
                         if (instr[11:7] == 0) begin  // EBREAK
                             is_system = 1;
                             imm = 1;
-                        end else begin // J(AL)R
-                            if (instr[10:7] == 4'd1 && !instr[12]) is_ret = 1;
+                        end else begin // JALR
+                            if (instr[11:7] == 4'd1) is_ret = 1;
                             is_jalr = 1;
                             imm = 0;
-                            read_addr_a = instr[10:7];
-                            write_dest = {3'b000, instr[12]};
+                            read_addr_a = instr[11:7];
+                            write_dest = 4'd1;  // x1 = ra
                         end
-                    end else begin  // C.MV and C.ADD
+                    end else begin  // C.MV: bit 12 = 0, rs2 != 0
                         is_alu_reg = 1;
-                        read_addr_a = instr[12] ? instr[10:7] : 4'd0;
-                        read_addr_b = instr[5:2];
-                        write_dest  = instr[10:7];
+                        read_addr_a = 4'd0;
+                        read_addr_b = instr[6:2];
+                        write_dest  = instr[11:7];
                     end
                 end
                 5'b10101: begin // C.MUL16
                     is_alu_reg = 1;
                     alu_opcode = 4'b1010;
-                    read_addr_a = instr[10:7];
-                    read_addr_b = instr[5:2];
-                    write_dest  = instr[10:7];                    
+                    read_addr_a = instr[11:7];
+                    read_addr_b = instr[6:2];
+                    write_dest  = instr[11:7];
                 end
                 5'b10110: begin // SWSP
                     is_store = 1;
                     mem_opcode = 3'b010;
-                    imm = CSWSPimm;
+                    imm = c_swsp_imm;
                     read_addr_a = 4'd2;
-                    read_addr_b = instr[5:2];
+                    read_addr_b = instr[6:2];
                 end
                 5'b10111: begin // SWTP
                     is_store = 1;
                     mem_opcode = 3'b010;
-                    imm = CSWSPimm;
+                    imm = c_swsp_imm;
                     read_addr_a = 4'd4;
-                    read_addr_b = instr[5:2];
+                    read_addr_b = instr[6:2];
                 end
                 default: begin
                     is_system = 1;
