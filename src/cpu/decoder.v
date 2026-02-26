@@ -292,8 +292,8 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                 5'b01000: begin // C.ADDI (CI-Type)
                     is_alu_imm = 1;
                     imm = c_alu_imm;
-                    read_addr_a = instr[11:7];
-                    write_dest  = instr[11:7];
+                    read_addr_a = instr[10:7];
+                    write_dest  = instr[10:7];
                 end
                 5'b01001: begin // JAL
                     is_jal = 1;
@@ -304,11 +304,11 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                     is_alu_imm = 1;
                     imm = c_alu_imm;
                     read_addr_a = 4'd0;
-                    write_dest  = instr[11:7];
+                    write_dest  = instr[10:7];
                 end
                 5'b01011: begin // ADDI16SP/LUI
-                    write_dest  = instr[11:7];
-                    if (instr[11:7] == 4'd2) begin
+                    write_dest  = instr[10:7];
+                    if (instr[10:7] == 4'd2) begin
                         is_alu_imm = 1;
                         imm = c_addi16sp_imm;
                         read_addr_a = 4'd2;
@@ -380,8 +380,8 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                 5'b10000: begin // C.SLLI (CI-Type)
                     is_alu_imm = 1;
                     imm = c_alu_imm;
-                    read_addr_a = instr[11:7];
-                    write_dest  = instr[11:7];
+                    read_addr_a = instr[10:7];
+                    write_dest  = instr[10:7];
                     alu_opcode = 4'b0001;
                 end
                 5'b10001: begin // LCXT: Load rd[2:0]+1 contiguous registers starting at {rd[4:3], 3'b001}
@@ -397,59 +397,59 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                     mem_opcode = 3'b010;
                     imm = c_lwsp_imm;
                     read_addr_a = 4'd2;
-                    write_dest  = instr[11:7];
+                    write_dest  = instr[10:7];
                 end
                 5'b10011: begin // LWTP
                     is_load = 1;
                     mem_opcode = 3'b010;
                     imm = c_lwsp_imm;
                     read_addr_a = 4'd4;
-                    write_dest  = instr[11:7];
+                    write_dest  = instr[10:7];
                 end
                 5'b10100: begin 
-                    if (instr[12]) begin  // C.ADD: bit 12 = 1
+                    if (instr[12]) begin  // C.ADD
                         is_alu_reg = 1;
-                        read_addr_a = instr[11:7];
-                        read_addr_b = instr[6:2];
-                        write_dest  = instr[11:7];
+                        read_addr_a = instr[10:7];
+                        read_addr_b = instr[5:2];
+                        write_dest  = instr[10:7];
                     end else if (instr[6:2] == 0) begin  // JALR or EBREAK: bit 12 = 0, rs2 = 0
                         if (instr[11:7] == 0) begin  // EBREAK
                             is_system = 1;
                             imm = 1;
                         end else begin // JALR
-                            if (instr[11:7] == 4'd1) is_ret = 1;
+                            if (instr[11:7] == 5'd1) is_ret = 1;
                             is_jalr = 1;
                             imm = 0;
-                            read_addr_a = instr[11:7];
+                            read_addr_a = instr[10:7];
                             write_dest = 4'd1;  // x1 = ra
                         end
                     end else begin  // C.MV: bit 12 = 0, rs2 != 0
                         is_alu_reg = 1;
                         read_addr_a = 4'd0;
-                        read_addr_b = instr[6:2];
-                        write_dest  = instr[11:7];
+                        read_addr_b = instr[5:2];
+                        write_dest  = instr[10:7];
                     end
                 end
                 5'b10101: begin // C.MUL16
                     is_alu_reg = 1;
                     alu_opcode = 4'b1010;
-                    read_addr_a = instr[11:7];
-                    read_addr_b = instr[6:2];
-                    write_dest  = instr[11:7];
+                    read_addr_a = instr[10:7];
+                    read_addr_b = instr[5:2];
+                    write_dest  = instr[10:7];
                 end
                 5'b10110: begin // SWSP
                     is_store = 1;
                     mem_opcode = 3'b010;
                     imm = c_swsp_imm;
                     read_addr_a = 4'd2;
-                    read_addr_b = instr[6:2];
+                    read_addr_b = instr[5:2];
                 end
                 5'b10111: begin // SWTP
                     is_store = 1;
                     mem_opcode = 3'b010;
                     imm = c_swsp_imm;
                     read_addr_a = 4'd4;
-                    read_addr_b = instr[6:2];
+                    read_addr_b = instr[5:2];
                 end
                 default: begin
                     is_system = 1;
