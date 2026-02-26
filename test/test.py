@@ -20,7 +20,7 @@ def test_alu():
         toplevel="tb_alu",
         module="unit.alu.test_alu",
         simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/alu",
+        work_dir=f"{SRC_DIR}/sim_build/alu",
         python_search=[str(TEST_DIR)],
     )
 
@@ -35,6 +35,20 @@ def test_multiplier():
         module="unit.alu.test_multiplier",
         simulator="icarus",
         work_dir=f"{TEST_DIR}/sim_build/multiplier",
+        python_search=[str(TEST_DIR)],
+    )
+
+
+def test_shifter():
+    simulator.run(
+        verilog_sources=[
+            f"{SRC_DIR}/cpu/alu.v",
+            f"{TEST_DIR}/unit/alu/tb_shifter.v",
+        ],
+        toplevel="tb_shifter",
+        module="unit.alu.test_shifter",
+        simulator="icarus",
+        work_dir=f"{TEST_DIR}/sim_build/shifter",
         python_search=[str(TEST_DIR)],
     )
 
