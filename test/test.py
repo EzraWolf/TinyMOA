@@ -7,134 +7,74 @@ import pytest
 from pathlib import Path
 from cocotb_test import simulator
 
-TEST_DIR = Path(__file__).parent.resolve()
-SRC_DIR = f"{TEST_DIR.parent}/src"
 
+def run_unit_test(src_module, test_module, test_type="unit", dir=None):
+    """
+    Run a standard cocotb unit test using pytest and cocotb-test.
+    """
+    PROJECT_DIR = Path(__file__).parent.resolve()
+    SRC_DIR = PROJECT_DIR.parent / "src"
+    SIM_BUILD = PROJECT_DIR / "sim_build"
 
-def test_alu():
+    test_dir = dir or src_module
+
+    src_path = SRC_DIR / (dir or "") / f"{src_module}.v"
+    tb_path = PROJECT_DIR / test_type / test_dir / f"tb_{src_module}.v"
+    module = f"{test_type}.{test_dir}.test_{test_module}"
+    toplevel = f"tb_{src_module}"
+
     simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/alu.v",
-            f"{TEST_DIR}/unit/alu/tb_alu.v",
-        ],
-        toplevel="tb_alu",
-        module="unit.alu.test_alu",
+        verilog_sources=[str(src_path), str(tb_path)],
+        toplevel=toplevel,
+        module=module,
         simulator="icarus",
-        work_dir=f"{SRC_DIR}/sim_build/alu",
-        python_search=[str(TEST_DIR)],
+        sim_build=str(SIM_BUILD / src_module),
+        python_search=[str(PROJECT_DIR)],
     )
+
+
+# ALU Unit Tests
+def test_alu():
+    run_unit_test("alu", "alu", dir="alu")
 
 
 def test_multiplier():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/alu.v",
-            f"{TEST_DIR}/unit/alu/tb_multiplier.v",
-        ],
-        toplevel="tb_multiplier",
-        module="unit.alu.test_multiplier",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/multiplier",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("multiplier", "multiplier", dir="alu")
 
 
 def test_shifter():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/alu.v",
-            f"{TEST_DIR}/unit/alu/tb_shifter.v",
-        ],
-        toplevel="tb_shifter",
-        module="unit.alu.test_shifter",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/shifter",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("shifter", "shifter", dir="alu")
 
 
+# Decoder Unit Tests
 def test_decoder_integration():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/decoder.v",
-            f"{TEST_DIR}/unit/decoder/tb_decoder.v",
-        ],
-        toplevel="tb_decoder",
-        module="unit.decoder.test_decoder_integration",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/decoder",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("decoder", "decoder_integration")
+
+
+def test_decoder_moa():
+    run_unit_test("decoder", "decoder_moa")
 
 
 def test_decoder_rv32c():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/decoder.v",
-            f"{TEST_DIR}/unit/decoder/tb_decoder.v",
-        ],
-        toplevel="tb_decoder",
-        module="unit.decoder.test_decoder_rv32c",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/decoder",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("decoder", "decoder_rv32c")
 
 
 def test_decoder_rv32i():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/decoder.v",
-            f"{TEST_DIR}/unit/decoder/tb_decoder.v",
-        ],
-        toplevel="tb_decoder",
-        module="unit.decoder.test_decoder_rv32i",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/decoder",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("decoder", "decoder_rv32i")
 
 
+# Register Unit Tests
 def test_registers():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/registers.v",
-            f"{TEST_DIR}/unit/registers/tb_registers.v",
-        ],
-        toplevel="tb_registers",
-        module="unit.registers.test_registers",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/registers",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("registers", "registers")
 
 
 def test_counter():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/cpu/registers.v",
-            f"{TEST_DIR}/unit/registers/tb_counter.v",
-        ],
-        toplevel="tb_counter",
-        module="unit.registers.test_counter",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/counter",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("counter", "counter")
 
 
+# Integration tests (WIP)
 def test_main_design():
-    simulator.run(
-        verilog_sources=[
-            f"{SRC_DIR}/tinymoa.v",
-            f"{TEST_DIR}/integration/tb_placeholder.v",
-        ],
-        toplevel="testbench",
-        module="integration.test_placeholder",
-        simulator="icarus",
-        work_dir=f"{TEST_DIR}/sim_build/main",
-        python_search=[str(TEST_DIR)],
-    )
+    run_unit_test("placeholder", "placeholder", test_type="integration")
 
 
 if __name__ == "__main__":

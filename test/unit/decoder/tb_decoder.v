@@ -36,7 +36,7 @@ module tb_decoder (
 
     `ifdef COCOTB_SIM
     initial begin
-        $dumpfile ("decoder.fst");
+        $dumpfile ("tb_decoder.fst");
         $dumpvars (0, tb_decoder);
         #1;
     end

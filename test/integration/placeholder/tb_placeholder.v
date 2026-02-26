@@ -3,12 +3,12 @@
 
 // This testbench just instantiates the module and makes some convenient wires
 // that can be driven / tested by the cocotb test.py.
-module testbench ();
+module tb_placeholder ();
 
   // Dump the signals to a FST file. You can view it with gtkwave or surfer.
   initial begin
-    $dumpfile("testbench.fst");
-    $dumpvars(0, testbench);
+    $dumpfile("tb_placeholder.fst");
+    $dumpvars(0, tb_placeholder);
     #1;
   end
 
@@ -25,7 +25,7 @@ module testbench ();
   wire [7:0] uio_oe;
   */
 
-  tinymoa_top tinymoa_tb (
+  tinymoa_top placeholder (
       .clk (clk),
       .led (led)
       
