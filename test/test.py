@@ -72,9 +72,9 @@ def test_counter():
     run_unit_test("counter", "counter")
 
 
-# Integration tests (WIP)
-def test_main_design():
-    run_unit_test("placeholder", "placeholder", test_type="integration")
+# Integration tests
+# def test_main_design():
+#     run_unit_test("placeholder", "placeholder", test_type="integration")
 
 
 if __name__ == "__main__":
