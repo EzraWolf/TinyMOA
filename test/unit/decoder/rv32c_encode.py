@@ -231,14 +231,14 @@ def encode_c_jal(imm):
         bit[7]=offset[6], bit[6]=offset[7], bit[5:3]=offset[3:1], bit[2]=offset[5]
     """
     scrambled = (
-        ((imm >> 11) & 1) << 10 |  # offset[11] -> bit[12]
-        ((imm >> 4) & 1) << 9 |    # offset[4] -> bit[11]
-        ((imm >> 8) & 3) << 7 |    # offset[9:8] -> bits[10:9]
-        ((imm >> 10) & 1) << 6 |   # offset[10] -> bit[8]
-        ((imm >> 6) & 1) << 5 |    # offset[6] -> bit[7]
-        ((imm >> 7) & 1) << 4 |    # offset[7] -> bit[6]
-        ((imm >> 1) & 7) << 1 |    # offset[3:1] -> bits[5:3]
-        ((imm >> 5) & 1)           # offset[5] -> bit[2]
+        ((imm >> 11) & 1) << 10  # offset[11] -> bit[12]
+        | ((imm >> 4) & 1) << 9  # offset[4] -> bit[11]
+        | ((imm >> 8) & 3) << 7  # offset[9:8] -> bits[10:9]
+        | ((imm >> 10) & 1) << 6  # offset[10] -> bit[8]
+        | ((imm >> 6) & 1) << 5  # offset[6] -> bit[7]
+        | ((imm >> 7) & 1) << 4  # offset[7] -> bit[6]
+        | ((imm >> 1) & 7) << 1  # offset[3:1] -> bits[5:3]
+        | ((imm >> 5) & 1)  # offset[5] -> bit[2]
     )
     return encode_cj_type(0b001, scrambled, 0b01)
 
@@ -262,10 +262,10 @@ def encode_c_addi16sp(imm):
     """
     imm_hi = (imm >> 9) & 0x1
     imm_lo = (
-        ((imm >> 4) & 0x1) << 4 |  # imm[4] -> imm_lo[4] -> instr[6]
-        ((imm >> 6) & 0x1) << 3 |  # imm[6] -> imm_lo[3] -> instr[5]
-        ((imm >> 7) & 0x3) << 1 |  # imm[8:7] -> imm_lo[2:1] -> instr[4:3]
-        ((imm >> 5) & 0x1)         # imm[5] -> imm_lo[0] -> instr[2]
+        ((imm >> 4) & 0x1) << 4  # imm[4] -> imm_lo[4] -> instr[6]
+        | ((imm >> 6) & 0x1) << 3  # imm[6] -> imm_lo[3] -> instr[5]
+        | ((imm >> 7) & 0x3) << 1  # imm[8:7] -> imm_lo[2:1] -> instr[4:3]
+        | ((imm >> 5) & 0x1)  # imm[5] -> imm_lo[0] -> instr[2]
     )
     return encode_ci_type(0b011, imm_hi, 2, imm_lo, 0b01)  # rd=2 is sp
 
@@ -355,14 +355,14 @@ def encode_c_j(imm):
     Same scrambling as C.JAL
     """
     scrambled = (
-        ((imm >> 11) & 1) << 10 |  # offset[11] -> bit[12]
-        ((imm >> 4) & 1) << 9 |    # offset[4] -> bit[11]
-        ((imm >> 8) & 3) << 7 |    # offset[9:8] -> bits[10:9]
-        ((imm >> 10) & 1) << 6 |   # offset[10] -> bit[8]
-        ((imm >> 6) & 1) << 5 |    # offset[6] -> bit[7]
-        ((imm >> 7) & 1) << 4 |    # offset[7] -> bit[6]
-        ((imm >> 1) & 7) << 1 |    # offset[3:1] -> bits[5:3]
-        ((imm >> 5) & 1)           # offset[5] -> bit[2]
+        ((imm >> 11) & 1) << 10  # offset[11] -> bit[12]
+        | ((imm >> 4) & 1) << 9  # offset[4] -> bit[11]
+        | ((imm >> 8) & 3) << 7  # offset[9:8] -> bits[10:9]
+        | ((imm >> 10) & 1) << 6  # offset[10] -> bit[8]
+        | ((imm >> 6) & 1) << 5  # offset[6] -> bit[7]
+        | ((imm >> 7) & 1) << 4  # offset[7] -> bit[6]
+        | ((imm >> 1) & 7) << 1  # offset[3:1] -> bits[5:3]
+        | ((imm >> 5) & 1)  # offset[5] -> bit[2]
     )
     return encode_cj_type(0b101, scrambled, 0b01)
 
@@ -375,21 +375,23 @@ def encode_c_beqz(rs1, imm):
     So: bit[12]=offset[8], bits[6:5]=offset[7:6], bit[2]=offset[5], bits[11:10]=offset[4:3], bits[4:3]=offset[2:1]
     """
     offset_hi = (
-        ((imm >> 8) & 0x1) << 2 |  # offset[8] -> offset_hi[2] -> bit[12]
-        ((imm >> 3) & 0x3)         # offset[4:3] -> offset_hi[1:0] -> bits[11:10]
+        ((imm >> 8) & 0x1) << 2  # offset[8] -> offset_hi[2] -> bit[12]
+        | ((imm >> 3) & 0x3)  # offset[4:3] -> offset_hi[1:0] -> bits[11:10]
     )
     offset_lo = (
-        ((imm >> 6) & 0x3) << 3 |  # offset[7:6] -> offset_lo[4:3] -> bits[6:5]
-        ((imm >> 5) & 0x1) << 2 |  # offset[5] -> offset_lo[2] -> bit[4]
-        ((imm >> 1) & 0x3)         # offset[2:1] -> offset_lo[1:0] -> bits[3:2] (wait, bit[2] in CB is offset 5...)
+        ((imm >> 6) & 0x3) << 3  # offset[7:6] -> offset_lo[4:3] -> bits[6:5]
+        | ((imm >> 5) & 0x1) << 2  # offset[5] -> offset_lo[2] -> bit[4]
+        | (
+            (imm >> 1) & 0x3
+        )  # offset[2:1] -> offset_lo[1:0] -> bits[3:2] (wait, bit[2] in CB is offset 5...)
     )
     # Actually, let me recalculate: CB-Type places offset_lo at bits[6:2]
     # Decoder: bits[6:5]=offset[7:6], bit[2]=offset[5], bits[4:3]=offset[2:1]
     # So: offset_lo[4:3] -> bits[6:5], offset_lo[0] -> bit[2], offset_lo[2:1] -> bits[4:3]
     offset_lo = (
-        ((imm >> 6) & 0x3) << 3 |  # offset[7:6] -> offset_lo[4:3]
-        ((imm >> 1) & 0x3) << 1 |  # offset[2:1] -> offset_lo[2:1]
-        ((imm >> 5) & 0x1)         # offset[5] -> offset_lo[0]
+        ((imm >> 6) & 0x3) << 3  # offset[7:6] -> offset_lo[4:3]
+        | ((imm >> 1) & 0x3) << 1  # offset[2:1] -> offset_lo[2:1]
+        | ((imm >> 5) & 0x1)  # offset[5] -> offset_lo[0]
     )
     return encode_cb_type(0b110, offset_hi, rs1 & 0x7, offset_lo, 0b01)
 
@@ -402,13 +404,13 @@ def encode_c_bnez(rs1, imm):
     Same scrambling as C.BEQZ
     """
     offset_hi = (
-        ((imm >> 8) & 0x1) << 2 |  # offset[8] -> offset_hi[2] -> bit[12]
-        ((imm >> 3) & 0x3)         # offset[4:3] -> offset_hi[1:0] -> bits[11:10]
+        ((imm >> 8) & 0x1) << 2  # offset[8] -> offset_hi[2] -> bit[12]
+        | ((imm >> 3) & 0x3)  # offset[4:3] -> offset_hi[1:0] -> bits[11:10]
     )
     offset_lo = (
-        ((imm >> 6) & 0x3) << 3 |  # offset[7:6] -> offset_lo[4:3]
-        ((imm >> 1) & 0x3) << 1 |  # offset[2:1] -> offset_lo[2:1]
-        ((imm >> 5) & 0x1)         # offset[5] -> offset_lo[0]
+        ((imm >> 6) & 0x3) << 3  # offset[7:6] -> offset_lo[4:3]
+        | ((imm >> 1) & 0x3) << 1  # offset[2:1] -> offset_lo[2:1]
+        | ((imm >> 5) & 0x1)  # offset[5] -> offset_lo[0]
     )
     return encode_cb_type(0b111, offset_hi, rs1 & 0x7, offset_lo, 0b01)
 

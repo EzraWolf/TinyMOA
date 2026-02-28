@@ -539,10 +539,9 @@ async def test_c_jal(dut):
     await setup_decoder(dut)
 
     for _ in range(20):
-
         # Remember...
         # CJ-type: 11-bit signed scaled by 2 = 12-bit signed immediate.
-        offset = random.randint(-1024, 1023) << 1 
+        offset = random.randint(-1024, 1023) << 1
         dut.instr.value = rv32c.encode_c_jal(offset)
         await ClockCycles(dut.clk, 1)
 
@@ -759,7 +758,9 @@ async def test_c_j(dut):
     await setup_decoder(dut)
 
     for _ in range(20):
-        offset = random.randint(-1024, 1023) << 1  # CJ-type: 12-bit signed (-2048 to +2046)
+        offset = (
+            random.randint(-1024, 1023) << 1
+        )  # CJ-type: 12-bit signed (-2048 to +2046)
         dut.instr.value = rv32c.encode_c_j(offset)
         await ClockCycles(dut.clk, 1)
 
