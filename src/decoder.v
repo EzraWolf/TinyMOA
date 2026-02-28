@@ -407,27 +407,35 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                     write_dest  = instr[10:7];
                 end
                 5'b10100: begin 
-                    if (instr[12]) begin  // C.ADD
-                        is_alu_reg = 1;
-                        read_addr_a = instr[10:7];
-                        read_addr_b = instr[5:2];
-                        write_dest  = instr[10:7];
-                    end else if (instr[6:2] == 5'd0) begin  // JALR or EBREAK: bit 12 = 0, rs2 = 0
-                        if (instr[11:7] == 5'd0) begin  // EBREAK
-                            is_system = 1;
-                            imm = 1;
-                        end else begin // JALR
+                    if (instr[12]) begin  // funct4[12] = 1
+                        if (instr[6:2] != 5'd0) begin  // C.ADD: bit 12 = 1, rs2 != 0
+                            is_alu_reg = 1;
+                            read_addr_a = instr[10:7];
+                            read_addr_b = instr[5:2];
+                            write_dest  = instr[10:7];
+                        end else if (instr[11:7] != 5'd0) begin  // C.JALR: bit 12 = 1, rs1 != 0, rs2 = 0
                             if (instr[11:7] == 5'd1) is_ret = 1;
                             is_jalr = 1;
                             imm = 0;
                             read_addr_a = instr[10:7];
                             write_dest = 4'd1;  // x1 = ra
+                        end else begin  // C.EBREAK: bit 12 = 1, rs1 = 0, rs2 = 0
+                            is_system = 1;
+                            imm = 32'd1;
                         end
-                    end else begin  // C.MV: bit 12 = 0, rs2 != 0
-                        is_alu_reg = 1;
-                        read_addr_a = 4'd0;
-                        read_addr_b = instr[5:2];
-                        write_dest  = instr[10:7];
+                    end else begin  // funct4[12] = 0
+                        if (instr[6:2] == 5'd0) begin  // C.JR: bit 12 = 0, rs2 = 0 (C.EBREAK is at bit 12=1)
+                            if (instr[11:7] == 5'd1) is_ret = 1;
+                            is_jalr = 1;
+                            imm = 0;
+                            read_addr_a = instr[10:7];
+                            write_dest = 4'd1;  // TinyMOA: C.JR also writes to x1
+                        end else begin  // C.MV: bit 12 = 0, rs2 != 0
+                            is_alu_reg = 1;
+                            read_addr_a = 4'd0;
+                            read_addr_b = instr[5:2];
+                            write_dest  = instr[10:7];
+                        end
                     end
                 end
                 5'b10101: begin // C.MUL16

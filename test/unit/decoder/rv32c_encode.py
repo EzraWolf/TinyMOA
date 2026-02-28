@@ -108,13 +108,16 @@ def encode_c_addi4spn(rd, imm):
     """
     Compressed Add Immediate to Stack Pointer scaled by 4 (CIW-Type)
     C.ADDI4SPN rd', imm
+    Decoder: c_addi4sp_imm = {22'b0, instr[10:7], instr[12:11], instr[5], instr[6], 2'b0}
+    So imm[9:6]→bits[10:7], imm[5:4]→bits[12:11], imm[3]→bit[5], imm[2]→bit[6]
+    CIW format places scrambled at bits[12:5], so:
+    scrambled[7:6]=imm[5:4], scrambled[5:2]=imm[9:6], scrambled[1]=imm[2], scrambled[0]=imm[3]
     """
-    # imm[5:4|9:6|2|3] scrambled to [12:5]
     scrambled = (
-        ((imm & 0x030) << 2)
-        | ((imm & 0x3C0) << 1)
-        | ((imm & 0x004) << 1)
-        | ((imm & 0x008) >> 3)
+        ((imm & 0x030) << 2)  # imm[5:4] -> scrambled[7:6]
+        | ((imm & 0x3C0) >> 4)  # imm[9:6] -> scrambled[5:2]
+        | ((imm & 0x004) >> 1)  # imm[2] -> scrambled[1]
+        | ((imm & 0x008) >> 3)  # imm[3] -> scrambled[0]
     )
     return encode_ciw_type(0b000, scrambled, rd & 0x7, 0b00)
 
@@ -139,6 +142,61 @@ def encode_c_sw(rs1, rs2, imm):
     imm_hi = (imm >> 3) & 0x7
     imm_lo = ((imm >> 6) & 0x1) | ((imm >> 1) & 0x2)
     return encode_cs_type(0b110, imm_hi, rs1 & 0x7, imm_lo, rs2 & 0x7, 0b00)
+
+
+def encode_c_lbu(rd, rs1, imm):
+    """
+    Compressed Load Byte Unsigned (CL-Type variant)
+    C.LBU rd', imm(rs1')
+    bits[12:10]=000 (load byte), imm[1:0] → bits[6:5]
+    Decoder: c_lsb_imm = {30'b0, instr[5], instr[6]} = {30'b0, imm[1], imm[0]}
+    So imm[1]→bit5, imm[0]→bit6, requiring bit swap
+    """
+    imm_lo = ((imm >> 1) & 0x1) | ((imm & 0x1) << 1)
+    return encode_cl_type(0b100, 0b000, rs1 & 0x7, imm_lo, rd & 0x7, 0b00)
+
+
+def encode_c_lhu(rd, rs1, imm):
+    """
+    Compressed Load Halfword Unsigned (CL-Type variant)
+    C.LHU rd', imm(rs1')
+    bits[12:10]: bit[11]=0 (load), bit[10]=1 (halfword) → imm_hi=0b001
+    """
+    imm_lo = (imm >> 1) & 0x1
+    return encode_cl_type(0b100, 0b001, rs1 & 0x7, imm_lo, rd & 0x7, 0b00)
+
+
+def encode_c_lh(rd, rs1, imm):
+    """
+    Compressed Load Halfword Signed (CL-Type variant)
+    C.LH rd', imm(rs1')
+    bits[12:10]: bit[11]=0 (load), bit[10]=1 (halfword) → imm_hi=0b001
+    bit[6]=1 (signed) via imm_lo bit 1
+    """
+    imm_lo = ((imm >> 1) & 0x1) | 0x2
+    return encode_cl_type(0b100, 0b001, rs1 & 0x7, imm_lo, rd & 0x7, 0b00)
+
+
+def encode_c_sb(rs1, rs2, imm):
+    """
+    Compressed Store Byte (CS-Type variant)
+    C.SB rs2', imm(rs1')
+    bits[12:10]: bit[11]=1 (store), bit[10]=0 (byte) → imm_hi=0b010
+    Decoder: c_lsb_imm = {30'b0, instr[5], instr[6]} = {30'b0, imm[1], imm[0]}
+    So imm[1]→bit5, imm[0]→bit6, requiring bit swap
+    """
+    imm_lo = ((imm >> 1) & 0x1) | ((imm & 0x1) << 1)
+    return encode_cs_type(0b100, 0b010, rs1 & 0x7, imm_lo, rs2 & 0x7, 0b00)
+
+
+def encode_c_sh(rs1, rs2, imm):
+    """
+    Compressed Store Halfword (CS-Type variant)
+    C.SH rs2', imm(rs1')
+    bits[12:10]: bit[11]=1 (store), bit[10]=1 (halfword) → imm_hi=0b011
+    """
+    imm_lo = (imm >> 1) & 0x1
+    return encode_cs_type(0b100, 0b011, rs1 & 0x7, imm_lo, rs2 & 0x7, 0b00)
 
 
 # ----------------------------------------------------------------------------
@@ -348,10 +406,13 @@ def encode_c_lwsp(rd, imm):
     """
     Compressed Load Word from Stack Pointer (CI-Type)
     C.LWSP rd, imm(sp)
+    Decoder: c_lwsp_imm = {24'b0, instr[3:2], instr[12], instr[6:4], 2'b00}
+    So imm[7:6]→bits[3:2], imm[5]→bit[12], imm[4:2]→bits[6:4]
+    CI format: bit[12]=imm_hi, bits[6:2]=(imm_lo<<2)[6:2]=imm_lo[4:0]
+    Need: imm_lo[4:2]=imm[4:2], imm_lo[1:0]=imm[7:6]
     """
-    # imm[5] to [12], imm[4:2|7:6] to [6:2]
     imm_hi = (imm >> 5) & 0x1
-    imm_lo = ((imm >> 2) & 0x7) | ((imm >> 4) & 0x18)
+    imm_lo = (imm & 0x1C) | ((imm >> 6) & 0x3)
     return encode_ci_type(0b010, imm_hi, rd, imm_lo, 0b10)
 
 
@@ -359,9 +420,12 @@ def encode_c_swsp(rs2, imm):
     """
     Compressed Store Word to Stack Pointer (CSS-Type)
     C.SWSP rs2, imm(sp)
+    Decoder: c_swsp_imm = {24'b0, instr[8:7], instr[12:9], 2'b00}
+    So imm[7:6]→bits[8:7], imm[5:2]→bits[12:9]
+    CSS format: bits[12:7]=scrambled[5:0]
+    Need: bits[12:9]=imm[5:2], bits[8:7]=imm[7:6]
     """
-    # imm[5:2|7:6] to [12:7]
-    scrambled = ((imm << 1) & 0x3C) | ((imm >> 4) & 0x3)
+    scrambled = (imm & 0x3C) | ((imm >> 6) & 0x3)
     return encode_css_type(0b110, scrambled, rs2, 0b10)
 
 
