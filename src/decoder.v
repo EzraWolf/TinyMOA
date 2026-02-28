@@ -412,8 +412,8 @@ module tinymoa_decoder #(parameter REG_ADDR_WIDTH = 4) (
                         read_addr_a = instr[10:7];
                         read_addr_b = instr[5:2];
                         write_dest  = instr[10:7];
-                    end else if (instr[6:2] == 0) begin  // JALR or EBREAK: bit 12 = 0, rs2 = 0
-                        if (instr[11:7] == 0) begin  // EBREAK
+                    end else if (instr[6:2] == 5'd0) begin  // JALR or EBREAK: bit 12 = 0, rs2 = 0
+                        if (instr[11:7] == 5'd0) begin  // EBREAK
                             is_system = 1;
                             imm = 1;
                         end else begin // JALR
