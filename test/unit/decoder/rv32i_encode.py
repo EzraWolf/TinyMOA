@@ -441,6 +441,22 @@ def encode_fence_i():
     return encode_i_type(0, 0, 0x1, 0, 0x0F)
 
 
+def encode_mret():
+    """
+    Machine Return (Privileged)
+    MRET
+    """
+    return 0x30200073
+
+
+def encode_wfi():
+    """
+    Wait For Interrupt (Privileged)
+    WFI
+    """
+    return 0x10500073
+
+
 # --- CSR Instructions ---
 
 
