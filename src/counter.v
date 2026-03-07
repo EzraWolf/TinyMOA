@@ -1,40 +1,38 @@
 
-// Nibble-series counter register used as the Program Counter (PC)
-// Counts the 32b register 4b at a time over 8 cycles.
-// 
-// Based on: https://github.com/MichaelBell/tinyQV/blob/858986b72975157ebf27042779b6caaed164c57b/cpu/counter.v
-module tinymoa_counter #(parameter DATA_WIDTH = 4) (
-    input clk,
-    input nrst,
+`default_nettype none
+`timescale 1ns / 1ps
 
-    input increment,
-    input [2:0] nibble_counter,
-
-    output [DATA_WIDTH-1:0] data,
-    output carry_out
+module tinymoa_counter (
+    input  wire       clk,
+    input  wire       load_en,
+    input  wire       increment,
+    input  wire       decrement,
+    input  wire       start,
+    input  wire [3:0] bus_in,
+    output wire [3:0] data_out
 );
-    reg [31:0] register;
-    reg carry_bit;
 
-    wire [4:0] increment_result = {1'b0, register[7:4]} + {4'b0, (nibble_counter == 0) ? increment : carry_bit};
-    
+    reg [31:0] pc_reg;
+    reg        carry;
+
+    assign data_out = pc_reg[3:0];
+    wire enable = load_en | increment | decrement;
+
     always @(posedge clk) begin
-        if (!nrst) begin
-            register[3:0] <= 4'h0;
-            carry_bit <= 0;
-        end else begin
-            {carry_bit, register[3:0]} <= increment_result;
+        if (enable) begin
+            if (load_en) begin
+                // Shift in the new nibble to the top
+                pc_reg <= {bus_in, pc_reg[31:4]};
+                carry  <= 1'b0;
+            end else if (increment) begin
+                // Add 1 if the first nibble, otherwise add the carry.
+                {carry, pc_reg[31:28]} <= pc_reg[3:0] + (start? 4'd1 : {3'd0, carry});
+                pc_reg[27:0] <= pc_reg[31:4];
+            end else if (decrement) begin
+                // Subtracting 1 is the same as adding 15 (4'b1111) continuously.
+                {carry, pc_reg[31:28]} <= pc_reg[3:0] + 4'd15 + (start? 1'b0 : {3'd0, carry});
+                pc_reg[27:0] <= pc_reg[31:4];
+            end
         end
     end
-
-    wire [31:4] reg_buf;
-
-    // On SG13G2 and generic FPGA, no buffer required
-    // On Sky130A, need to use i_regbut using "sky130_fd_sc_hd__dlygate4sd3_1"
-    assign reg_buf = {register[3:0], register[31:8]};
-
-    always @(posedge clk) register[31:4] <= reg_buf;
-
-    assign data = register[3 + DATA_WIDTH:4];
-    assign carry_out = increment_result[4];
 endmodule

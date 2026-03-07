@@ -2,11 +2,13 @@
 `timescale 1ns / 1ps
 
 module tb_counter (
-    input clk,
-    input nrst,
-    input increment,
-    output reg [31:0] result,
-    output reg carry_out
+    input  wire        clk,
+    input  wire        tb_nrst,
+    input  wire        load_en,
+    input  wire        increment,
+    input  wire        decrement,
+    input  wire [31:0] load_data,
+    output wire [31:0] result
 );
 
     `ifdef COCOTB_SIM
@@ -17,31 +19,31 @@ module tb_counter (
     end
     `endif
 
-    reg [4:0] counter;
-    always @(posedge clk) begin
-        if (!nrst)
-            counter <= 0;
+    reg [2:0] nibble_counter;
+    wire active = load_en | increment | decrement;
+
+    always @(posedge clk or negedge tb_nrst) begin
+        if (!tb_nrst)
+            nibble_counter <= 3'd0;
+        else if (active)
+            nibble_counter <= nibble_counter + 3'd1;
         else
-            counter <= counter + 4;
+            nibble_counter <= 3'd0;
     end
 
-    wire [2:0] nibble_counter = counter[4:2];
-    wire [3:0] data;
-    wire carry_bit;
+    wire       start  = (nibble_counter == 3'd0);
+    wire [3:0] bus_in = load_data[nibble_counter * 4 +: 4];
+    wire [3:0] data_out;
 
-    tinymoa_counter dut_counter (
+    tinymoa_counter dut (
         .clk(clk),
-        .nrst(nrst),
-        .nibble_counter(nibble_counter),
+        .load_en(load_en),
         .increment(increment),
-        .data(data),
-        .carry_out(carry_bit)
+        .decrement(decrement),
+        .start(start),
+        .bus_in(bus_in),
+        .data_out(data_out)
     );
 
-    always @(posedge clk) begin
-        result[counter+:4] <= data;
-        if (nibble_counter == 3'b111)
-            carry_out <= carry_bit;
-    end
-
+    assign result = dut.pc_reg;
 endmodule
