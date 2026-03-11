@@ -3,6 +3,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, FallingEdge
 
+
 async def setup_dut(dut):
     """Initialize the clock, reset the TB, and flush the DUT to 0."""
     clock = Clock(dut.clk, 10, unit="ns")
@@ -19,7 +20,7 @@ async def setup_dut(dut):
     dut.tb_nrst.value = 0
     await ClockCycles(dut.clk, 1)
     dut.tb_nrst.value = 1
-    
+
     # 8-cycle flush to 0
     dut.load_en.value = 1
     dut.load_data.value = 0
@@ -54,16 +55,16 @@ async def test_load_sequential(dut):
     for _ in range(100):
         value = random.randint(0, 0xFFFFFFFF)
         dut.load_data.value = value
-        
+
         await ClockCycles(dut.clk, 8)
-        
+
         # Check mid-cycle to avoid reading pre-update flip-flops
         await FallingEdge(dut.clk)
         actual = int(dut.result.value)
         assert actual == value, (
             f"Sequential Load Failed: Expected {hex(value)}, got {hex(actual)}"
         )
-        
+
     dut.load_en.value = 0
 
 
@@ -76,20 +77,20 @@ async def test_increment(dut):
     dut.load_en.value = 1
     dut.load_data.value = expected
     await ClockCycles(dut.clk, 8)
-    
+
     dut.load_en.value = 0
     dut.increment.value = 1
 
     for _ in range(100):
         await ClockCycles(dut.clk, 8)
-        
+
         await FallingEdge(dut.clk)
         expected = (expected + 1) & 0xFFFFFFFF
         actual = int(dut.result.value)
         assert actual == expected, (
             f"Increment Failed: Expected {hex(expected)}, got {hex(actual)}"
         )
-        
+
     dut.increment.value = 0
 
 
@@ -102,20 +103,20 @@ async def test_decrement(dut):
     dut.load_en.value = 1
     dut.load_data.value = expected
     await ClockCycles(dut.clk, 8)
-    
+
     dut.load_en.value = 0
     dut.decrement.value = 1
 
     for _ in range(100):
         await ClockCycles(dut.clk, 8)
-        
+
         await FallingEdge(dut.clk)
         expected = (expected - 1) & 0xFFFFFFFF
         actual = int(dut.result.value)
         assert actual == expected, (
             f"Decrement Failed: Expected {hex(expected)}, got {hex(actual)}"
         )
-        
+
     dut.decrement.value = 0
 
 
@@ -127,7 +128,7 @@ async def test_rollover(dut):
     dut.load_en.value = 1
     dut.load_data.value = 0xFFFFFFFF
     await ClockCycles(dut.clk, 8)
-    
+
     dut.load_en.value = 0
     dut.increment.value = 1
     await ClockCycles(dut.clk, 8)
@@ -165,7 +166,7 @@ async def test_branch(dut):
     dut.load_en.value = 1
     dut.load_data.value = pc
     await ClockCycles(dut.clk, 8)
-    
+
     # 1. Sequential execution
     dut.load_en.value = 0
     dut.increment.value = 1
@@ -185,7 +186,7 @@ async def test_branch(dut):
     dut.load_en.value = 1
     dut.load_data.value = branch_target
     await ClockCycles(dut.clk, 8)
-    
+
     await FallingEdge(dut.clk)
     pc = branch_target
     actual = int(dut.result.value)
