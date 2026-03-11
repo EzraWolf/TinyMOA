@@ -72,6 +72,11 @@ def test_counter():
     run_unit_test("counter", "counter")
 
 
+# CSR Unit Tests
+def test_csr():
+    run_unit_test("csr", "csr")
+
+
 # Integration tests
 # def test_main_design():
 #     run_unit_test("placeholder", "placeholder", test_type="integration")
