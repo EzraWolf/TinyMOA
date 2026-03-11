@@ -11,7 +11,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 from numpy import random
 
-from . import rv32c_encode as rv32c
+import rv32c_encode as rv32c
 
 # === Test Setup ===
 

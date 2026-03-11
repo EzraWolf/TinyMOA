@@ -7,8 +7,8 @@ RISC-V ISA reference:
 https://ww1.microchip.com/downloads/aemDocuments/documents/FPGA/ProductDocuments/UserGuides/ip_cores/directcores/riscvspec.pdf
 """
 
-from . import rv32i_encode as rv32i
-from . import rv32c_encode as rv32c
+import rv32i_encode as rv32i
+import rv32c_encode as rv32c
 
 import cocotb
 from cocotb.clock import Clock
