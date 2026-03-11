@@ -8,7 +8,9 @@ from pathlib import Path
 from cocotb_test import simulator
 
 
-def run_unit_test(src_module, test_module, test_type="unit", dir=None):
+def run_unit_test(
+    src_module, test_module, test_type="unit", dir=None, extra_sources=None
+):
     """
     Run a standard cocotb unit test using pytest and cocotb-test.
     """
@@ -23,8 +25,14 @@ def run_unit_test(src_module, test_module, test_type="unit", dir=None):
     module = f"{test_type}.{test_dir}.test_{test_module}"
     toplevel = f"tb_{src_module}"
 
+    sources = (
+        [str(src_path)]
+        + [str(SRC_DIR / s) for s in (extra_sources or [])]
+        + [str(tb_path)]
+    )
+
     simulator.run(
-        verilog_sources=[str(src_path), str(tb_path)],
+        verilog_sources=sources,
         toplevel=toplevel,
         module=module,
         simulator="icarus",
@@ -44,6 +52,21 @@ def test_multiplier():
 
 def test_shifter():
     run_unit_test("shifter", "shifter", dir="alu")
+
+
+def test_core_generic():
+    run_unit_test(
+        "core_generic",
+        "core_generic",
+        test_type="integration",
+        extra_sources=[
+            "decoder.v",
+            "registers.v",
+            "alu/alu.v",
+            "alu/shifter.v",
+            "alu/multiplier.v",
+        ],
+    )
 
 
 # Decoder Unit Tests
