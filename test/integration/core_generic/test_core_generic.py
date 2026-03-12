@@ -54,7 +54,7 @@ async def run_instructions(dut, count):
 
 async def read_reg(dut, reg_num):
     dut.reg_probe_sel.value = reg_num
-    await ClockCycles(dut.clk, 9)  # 9 clocks guarantees a full 8-cycle aligned window
+    await ClockCycles(dut.clk, 9)  # Guarantees full 8-cycle aligned window
     return int(dut.reg_probe_val.value)
 
 
