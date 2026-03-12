@@ -118,7 +118,7 @@ async def test_state_sequence(dut):
 
 @cocotb.test()
 async def test_nop_pc_increments(dut):
-    """PC increments by 4 for each 32-bit NOP."""
+    """PC increments by 4 for each 32b NOP."""
     await setup(dut, [NOP] * 8)
 
     pc_values = []
@@ -236,7 +236,7 @@ async def test_fibonacci(dut):
         ],
     )
 
-    # 4 setup + 11 loop iterations * 5 instrs = 59 instructions
+    # 4 setup + (11 iters * 5 instrs) = 59 instructions
     # (i goes 1,2,...,12: 11 taken branches + final BNE not taken still executes)
     await run_instructions(dut, 59)
 
@@ -276,18 +276,18 @@ async def test_fibonacci_compressed(dut):
       0x0E  C.BNEZ x11, -8    if counter != 0, goto 0x06
     """
     c_program = [
-        rv32c.encode_c_li(8, 0),  # C.LI  x8,  0
-        rv32c.encode_c_li(9, 1),  # C.LI  x9,  1
-        rv32c.encode_c_li(11, 11),  # C.LI  x11, 11
-        rv32c.encode_c_mv(10, 9),  # C.MV  x10, x9
-        rv32c.encode_c_add(9, 8),  # C.ADD x9,  x8
-        rv32c.encode_c_mv(8, 10),  # C.MV  x8,  x10
-        rv32c.encode_c_addi(11, -1),  # C.ADDI x11, -1
-        rv32c.encode_c_bnez(11, -8),  # C.BNEZ x11, -8
+        rv32c.encode_c_li(8, 0),
+        rv32c.encode_c_li(9, 1),
+        rv32c.encode_c_li(11, 11),
+        rv32c.encode_c_mv(10, 9),
+        rv32c.encode_c_add(9, 8),
+        rv32c.encode_c_mv(8, 10),
+        rv32c.encode_c_addi(11, -1),
+        rv32c.encode_c_bnez(11, -8),
     ]
     await setup_compressed(dut, c_program)
 
-    # 3 setup instructions + 11 iterations × 5 instructions = 58 total
+    # 3 setup + (11 iters * 5 instr)
     await run_instructions(dut, 58)
 
     x8 = await read_reg(dut, 8)
@@ -319,15 +319,15 @@ async def test_load_store_word(dut):
     await setup(
         dut,
         [
-            rv32i.encode_addi(5, 0, 171),    # x5 = 0xAB
-            rv32i.encode_addi(6, 0, 128),    # x6 = 0x80
-            rv32i.encode_sw(6, 5, 0),        # mem[0x80] = x5
-            rv32i.encode_lw(7, 6, 0),        # x7 = mem[0x80]
-            rv32i.encode_addi(8, 0, 55),     # x8 = 0x37
-            rv32i.encode_add(9, 5, 8),       # x9 = x5 + x8 = 0xE2
-            rv32i.encode_sw(6, 9, 4),        # mem[0x84] = x9
-            rv32i.encode_lw(10, 6, 4),       # x10 = mem[0x84]
-            rv32i.encode_lw(11, 6, 0),       # x11 = mem[0x80]
+            rv32i.encode_addi(5, 0, 171),  # x5 = 0xAB
+            rv32i.encode_addi(6, 0, 128),  # x6 = 0x80
+            rv32i.encode_sw(6, 5, 0),  # mem[0x80] = x5
+            rv32i.encode_lw(7, 6, 0),  # x7 = mem[0x80]
+            rv32i.encode_addi(8, 0, 55),  # x8 = 0x37
+            rv32i.encode_add(9, 5, 8),  # x9 = x5 + x8 = 0xE2
+            rv32i.encode_sw(6, 9, 4),  # mem[0x84] = x9
+            rv32i.encode_lw(10, 6, 4),  # x10 = mem[0x84]
+            rv32i.encode_lw(11, 6, 0),  # x11 = mem[0x80]
         ],
     )
     await run_instructions(dut, 9)

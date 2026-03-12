@@ -6,7 +6,7 @@ module tb_core (
     input nrst,
 
     output [2:0]  dbg_state,
-    output [31:0] dbg_pc,
+    output [23:0] dbg_pc,
 
     // Register probe: set reg_probe_sel, read reg_probe_val after 8 clocks
     input  [3:0]  reg_probe_sel,
@@ -30,7 +30,7 @@ module tb_core (
             mem[j] = 32'h00000013; // NOP (ADDI x0, x0, 0)
     end
 
-    wire [31:0] mem_addr;
+    wire [23:0] mem_addr;
     wire        mem_read, mem_write;
     wire [31:0] mem_wdata;
     wire [1:0]  mem_size;

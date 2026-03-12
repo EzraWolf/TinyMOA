@@ -6,7 +6,7 @@ module tinymoa_core (
     input wire        clk,
     input wire        nrst,
 
-    output reg [31:0] mem_addr,
+    output wire [23:0] mem_addr,
     output reg        mem_read,
     output reg        mem_write,
     output reg [31:0] mem_wdata,
@@ -15,7 +15,7 @@ module tinymoa_core (
     input wire        mem_ready,
 
     output wire [2:0] dbg_state,
-    output wire [31:0] dbg_pc
+    output wire [23:0] dbg_pc
 );
     localparam S_FETCH    = 3'd0;
     localparam S_DECODE   = 3'd1;
@@ -29,14 +29,14 @@ module tinymoa_core (
 
     assign dbg_state = state;
 
-    // PC (24b = 16 MB address space)
-    // This covers internal scratchpad SRAM, external QSPI flash, and peripherals
-    reg [23:0] pc;
-    wire [31:0] pc_ext = {8'd0, pc};
-    assign dbg_pc = pc_ext;
+    reg [23:0] pc; // 24b = 16 MB address space
+    wire [3:0] pc_nibble = (nibble_counter < 3'd6) ? pc[{nibble_counter, 2'b00} +: 4] : 4'd0;
+    assign dbg_pc = pc;
 
-    // IR
     reg [31:0] instr_reg;
+
+    reg [23:0] mem_addr_reg;
+    assign mem_addr = mem_addr_reg;
 
     // Decoder
     wire [31:0] dec_imm;
@@ -107,7 +107,7 @@ module tinymoa_core (
 
     tinymoa_alu alu (
         .opcode(dec_alu_opcode),
-        .a_in(dec_is_auipc ? pc_ext[{nibble_counter, 2'b00} +: 4] : alu_a_nibble),
+        .a_in(dec_is_auipc ? pc_nibble : alu_a_nibble),
         .b_in(alu_b_nibble),
         .cmp_in(alu_cmp),
         .carry_in(alu_carry),
@@ -139,12 +139,11 @@ module tinymoa_core (
         .product(mul_result_nibble)
     );
 
-    // Load writeback registers
     reg [31:0] load_data;       // Latched mem_rdata for WB
     reg        load_top_bit;    // Sign extension bit
     reg [2:0]  load_wb_count;   // Count for S_LOAD_WB
 
-    // Sign extension (fill upper nibbles with sign bit for byte/half loads)
+    // Sign extension fills upper nibbles with sign bit for byte/half loads
     wire load_past_boundary = (dec_mem_opcode[1:0] == 2'b00 && nibble_counter > 3'd1)   // byte: nibbles 2-7
                            || (dec_mem_opcode[1:0] == 2'b01 && nibble_counter > 3'd3);  // half: nibbles 4-7
     wire [3:0] load_nibble = load_past_boundary ? {4{load_top_bit}}
@@ -152,7 +151,6 @@ module tinymoa_core (
 
     // ALU result mux
     reg [31:0] alu_result_full;
-
     wire is_shift = (dec_alu_opcode[2:0] == 3'b001) || (dec_alu_opcode[2:0] == 3'b101);
     wire is_mul   = (dec_alu_opcode == 4'b1010);
     wire is_slt   = (dec_alu_opcode[2:1] == 2'b01);  // SLT or SLTU
@@ -179,12 +177,12 @@ module tinymoa_core (
                         || (state == S_LOAD_WB);
 
     // JAL/JALR link address: PC + instruction byte length
-    // instr_len is in 16b parcels (1 or 2), shift left 1 to get bytes
-    // TODO: Could make this easier to read.
-    wire [31:0] pc_plus_ilen = pc_ext + {29'd0, dec_instr_len, 1'b0};
+    wire [23:0] pc_plus_ilen = pc + {21'd0, dec_instr_len, 1'b0};
+    wire [3:0] pc_plus_ilen_nibble = (nibble_counter < 3'd6)
+                                   ? pc_plus_ilen[{nibble_counter, 2'b00} +: 4] : 4'd0;
 
     assign reg_wdata_nibble = (state == S_LOAD_WB) ? load_nibble
-                            : (dec_is_jal || dec_is_jalr) ? pc_plus_ilen[{nibble_counter, 2'b00} +: 4]
+                            : (dec_is_jal || dec_is_jalr) ? pc_plus_ilen_nibble
                             : result_nibble;
 
     // Branch condition
@@ -207,9 +205,9 @@ module tinymoa_core (
             load_data      <= 32'd0;
             load_top_bit   <= 1'b0;
             load_wb_count  <= 3'd0;
+            mem_addr_reg   <= 24'd0;
             mem_read       <= 1'b0;
             mem_write      <= 1'b0;
-            mem_addr       <= 32'd0;
             mem_wdata      <= 32'd0;
             mem_size       <= 2'b10;
         end else begin
@@ -218,7 +216,7 @@ module tinymoa_core (
             case (state)
 
                 S_FETCH: begin
-                    mem_addr <= pc_ext;
+                    mem_addr_reg <= pc;
                     mem_read <= 1'b1;
                     mem_write <= 1'b0;
                     mem_size <= 2'b10; // word fetch
@@ -272,7 +270,7 @@ module tinymoa_core (
                 end
 
                 S_MEM: begin
-                    mem_addr <= alu_result_full;
+                    mem_addr_reg <= alu_result_full[23:0];
                     mem_size <= dec_mem_opcode[2:1];
                     if (dec_is_store) begin
                         mem_write <= 1'b1;
@@ -289,7 +287,7 @@ module tinymoa_core (
                             case (dec_mem_opcode[1:0])
                                 2'b00: load_top_bit <= ~dec_mem_opcode[2] & mem_rdata[7];   // LB sign
                                 2'b01: load_top_bit <= ~dec_mem_opcode[2] & mem_rdata[15];  // LH sign
-                                default: load_top_bit <= 1'b0;                               // LW
+                                default: load_top_bit <= 1'b0;                              // LW
                             endcase
                             load_wb_count <= 3'd0;
                             state <= S_LOAD_WB;
@@ -303,7 +301,6 @@ module tinymoa_core (
                     if (load_wb_count == 3'd7)
                         state <= S_WRITEBACK;
                 end
-
             endcase
         end
     end
