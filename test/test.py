@@ -54,21 +54,6 @@ def test_shifter():
     run_unit_test("shifter", "shifter", dir="alu")
 
 
-def test_core_generic():
-    run_unit_test(
-        "core_generic",
-        "core_generic",
-        test_type="integration",
-        extra_sources=[
-            "decoder.v",
-            "registers.v",
-            "alu/alu.v",
-            "alu/shifter.v",
-            "alu/multiplier.v",
-        ],
-    )
-
-
 # Decoder Unit Tests
 def test_decoder_integration():
     run_unit_test("decoder", "decoder_integration")
@@ -103,6 +88,21 @@ def test_csr():
 # Integration tests
 # def test_main_design():
 #     run_unit_test("placeholder", "placeholder", test_type="integration")
+
+
+def test_core_generic():
+    run_unit_test(
+        "core_generic",
+        "core_generic",
+        test_type="integration",
+        extra_sources=[
+            "decoder.v",
+            "registers.v",
+            "alu/alu.v",
+            "alu/shifter.v",
+            "alu/multiplier.v",
+        ],
+    )
 
 
 if __name__ == "__main__":
