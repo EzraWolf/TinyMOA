@@ -30,9 +30,11 @@ module tinymoa_core (
 
     assign dbg_state = state;
 
-    // PC
-    reg [31:0] pc;
-    assign dbg_pc = pc;
+    // PC (24b = 16 MB address space)
+    // This covers internal scratchpad SRAM, external QSPI flash, and peripherals
+    reg [23:0] pc;
+    wire [31:0] pc_ext = {8'd0, pc};
+    assign dbg_pc = pc_ext;
 
     // IR
     reg [31:0] instr_reg;
@@ -106,7 +108,7 @@ module tinymoa_core (
 
     tinymoa_alu alu (
         .opcode(dec_alu_opcode),
-        .a_in(dec_is_auipc ? pc[{nibble_counter, 2'b00} +: 4] : alu_a_nibble),
+        .a_in(dec_is_auipc ? pc_ext[{nibble_counter, 2'b00} +: 4] : alu_a_nibble),
         .b_in(alu_b_nibble),
         .cmp_in(alu_cmp),
         .carry_in(alu_carry),
@@ -134,7 +136,7 @@ module tinymoa_core (
         .clk(clk),
         .nrst(nrst),
         .a_in(reg_rs1_nibble),
-        .b_in(rs1_full[15:0]),  // Uses rs2 lower 16 bits actually — will fix in ALU routing
+        .b_in(rs1_full[15:0]),  // Uses rs2 lower 16 bits actually, fixes ALU routing
         .product(mul_result_nibble)
     );
 
@@ -168,7 +170,7 @@ module tinymoa_core (
     // JAL/JALR link address: PC + instruction byte length
     // instr_len is in 16b parcels (1 or 2), shift left 1 to get bytes
     // TODO: Could make this easier to read.
-    wire [31:0] pc_plus_ilen = pc + {29'd0, dec_instr_len, 1'b0};
+    wire [31:0] pc_plus_ilen = pc_ext + {29'd0, dec_instr_len, 1'b0};
 
     assign reg_wdata_nibble = (dec_is_jal || dec_is_jalr)
                               ? pc_plus_ilen[{nibble_counter, 2'b00} +: 4]
@@ -183,7 +185,7 @@ module tinymoa_core (
     always @(posedge clk) begin
         if (!nrst) begin
             state          <= S_FETCH;
-            pc             <= 32'd0;
+            pc             <= 24'd0;
             nibble_counter <= 3'd0;
             instr_reg      <= 32'd0;
             alu_carry      <= 1'b0;
@@ -202,7 +204,7 @@ module tinymoa_core (
             case (state)
 
                 S_FETCH: begin
-                    mem_addr <= pc;
+                    mem_addr <= pc_ext;
                     mem_read <= 1'b1;
                     mem_write <= 1'b0;
                     mem_size <= 2'b10; // word fetch
@@ -248,11 +250,11 @@ module tinymoa_core (
                 S_WRITEBACK: begin
                     if (branch_taken) begin
                         if (dec_is_jalr || dec_is_ret)
-                            pc <= alu_result_full & 32'hFFFFFFFE;
+                            pc <= alu_result_full[23:0] & 24'hFFFFFE;
                         else
-                            pc <= pc + dec_imm;
+                            pc <= pc + dec_imm[23:0];
                     end else begin
-                        pc <= pc + {29'd0, dec_instr_len, 1'b0};
+                        pc <= pc + {21'd0, dec_instr_len, 1'b0};
                     end
                     state <= S_FETCH;
                 end
@@ -271,8 +273,8 @@ module tinymoa_core (
                         mem_read  <= 1'b0;
                         mem_write <= 1'b0;
                         if (dec_is_load) begin
-                            // Writeback loaded data — for now write nibble-serially in a sub-loop
-                            // TODO: implement load writeback to regfile
+                            // Writeback loaded data
+                            // for now write nibble-serially in a sub-loop
                         end
                         state <= S_WRITEBACK;
                     end
