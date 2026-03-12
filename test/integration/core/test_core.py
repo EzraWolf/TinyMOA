@@ -14,6 +14,7 @@ S_DECODE = 1
 S_EXECUTE = 2
 S_WRITEBACK = 3
 S_MEM = 4
+S_LOAD_WB = 5
 
 
 async def setup(dut, program=None):
@@ -296,3 +297,87 @@ async def test_fibonacci_compressed(dut):
     )
     assert x8 == 89, f"fib(11): got x8={x8}, expected 89"
     assert x9 == 144, f"fib(12): got x9={x9}, expected 144"
+
+
+@cocotb.test()
+async def test_load_store_word(dut):
+    """Store words to memory, load them back, verify round-trip.
+
+    Uses addresses 0x80+ (word 32+) safely above the program area.
+
+    Program:
+      ADDI x5, x0, 171    # x5 = 0xAB
+      ADDI x6, x0, 128    # x6 = 0x80 (data base address)
+      SW   x5, 0(x6)      # mem[0x80] = 0xAB
+      LW   x7, 0(x6)      # x7 = mem[0x80] — expect 0xAB
+      ADDI x8, x0, 55     # x8 = 0x37
+      ADD  x9, x5, x8     # x9 = 0xAB + 0x37 = 0xE2
+      SW   x9, 4(x6)      # mem[0x84] = 0xE2
+      LW   x10, 4(x6)     # x10 = mem[0x84] — expect 0xE2
+      LW   x11, 0(x6)     # x11 = mem[0x80] — expect 0xAB (still there)
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 171),    # x5 = 0xAB
+            rv32i.encode_addi(6, 0, 128),    # x6 = 0x80
+            rv32i.encode_sw(6, 5, 0),        # mem[0x80] = x5
+            rv32i.encode_lw(7, 6, 0),        # x7 = mem[0x80]
+            rv32i.encode_addi(8, 0, 55),     # x8 = 0x37
+            rv32i.encode_add(9, 5, 8),       # x9 = x5 + x8 = 0xE2
+            rv32i.encode_sw(6, 9, 4),        # mem[0x84] = x9
+            rv32i.encode_lw(10, 6, 4),       # x10 = mem[0x84]
+            rv32i.encode_lw(11, 6, 0),       # x11 = mem[0x80]
+        ],
+    )
+    await run_instructions(dut, 9)
+
+    expected = {5: 171, 7: 171, 8: 55, 9: 226, 10: 226, 11: 171}
+    for reg, val in expected.items():
+        got = await read_reg(dut, reg)
+        dut._log.info(f"  x{reg} = {got} ({got:#010x}), expected {val} ({val:#010x})")
+        assert got == val, f"x{reg}: got {got}, expected {val}"
+
+
+@cocotb.test()
+async def test_load_store_computed(dut):
+    """Store-load-compute loop: accumulate values through memory.
+
+    Program:
+      ADDI x5, x0, 10       # x5 = 10
+      ADDI x6, x0, 128      # x6 = 0x80 (data base)
+      SW   x5, 0(x6)        # mem[0x80] = 10
+      LW   x7, 0(x6)        # x7 = 10
+      ADD  x7, x7, x5       # x7 = 10 + 10 = 20
+      SW   x7, 4(x6)        # mem[0x84] = 20
+      LW   x8, 4(x6)        # x8 = 20
+      ADD  x8, x8, x7       # x8 = 20 + 20 = 40
+      SW   x8, 8(x6)        # mem[0x88] = 40
+      LW   x9, 8(x6)        # x9 = 40
+      LW   x10, 0(x6)       # x10 = 10 (verify original still intact)
+      ADD  x11, x9, x10     # x11 = 40 + 10 = 50
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 10),
+            rv32i.encode_addi(6, 0, 128),
+            rv32i.encode_sw(6, 5, 0),
+            rv32i.encode_lw(7, 6, 0),
+            rv32i.encode_add(7, 7, 5),
+            rv32i.encode_sw(6, 7, 4),
+            rv32i.encode_lw(8, 6, 4),
+            rv32i.encode_add(8, 8, 7),
+            rv32i.encode_sw(6, 8, 8),
+            rv32i.encode_lw(9, 6, 8),
+            rv32i.encode_lw(10, 6, 0),
+            rv32i.encode_add(11, 9, 10),
+        ],
+    )
+    await run_instructions(dut, 12)
+
+    expected = {5: 10, 7: 20, 8: 40, 9: 40, 10: 10, 11: 50}
+    for reg, val in expected.items():
+        got = await read_reg(dut, reg)
+        dut._log.info(f"  x{reg} = {got} ({got:#010x}), expected {val} ({val:#010x})")
+        assert got == val, f"x{reg}: got {got}, expected {val}"

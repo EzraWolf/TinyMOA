@@ -17,13 +17,12 @@ module tinymoa_core (
     output wire [2:0] dbg_state,
     output wire [31:0] dbg_pc
 );
-
-    // State machine
     localparam S_FETCH    = 3'd0;
     localparam S_DECODE   = 3'd1;
     localparam S_EXECUTE  = 3'd2;
     localparam S_WRITEBACK = 3'd3;
     localparam S_MEM      = 3'd4;
+    localparam S_LOAD_WB  = 3'd5;
 
     reg [2:0] state;
     reg [2:0] nibble_counter;
@@ -140,6 +139,17 @@ module tinymoa_core (
         .product(mul_result_nibble)
     );
 
+    // Load writeback registers
+    reg [31:0] load_data;       // Latched mem_rdata for WB
+    reg        load_top_bit;    // Sign extension bit
+    reg [2:0]  load_wb_count;   // Count for S_LOAD_WB
+
+    // Sign extension (fill upper nibbles with sign bit for byte/half loads)
+    wire load_past_boundary = (dec_mem_opcode[1:0] == 2'b00 && nibble_counter > 3'd1)   // byte: nibbles 2-7
+                           || (dec_mem_opcode[1:0] == 2'b01 && nibble_counter > 3'd3);  // half: nibbles 4-7
+    wire [3:0] load_nibble = load_past_boundary ? {4{load_top_bit}}
+                                                : load_data[{nibble_counter, 2'b00} +: 4];
+
     // ALU result mux
     reg [31:0] alu_result_full;
 
@@ -165,16 +175,17 @@ module tinymoa_core (
     // TODO: Could make this easier to read.
     wire writes_rd = dec_is_alu_reg || dec_is_alu_imm || dec_is_lui || dec_is_auipc
                    || dec_is_jal || dec_is_jalr || dec_is_load;
-    assign reg_write_en = (state == S_EXECUTE) && writes_rd && !dec_is_load;
+    assign reg_write_en = ((state == S_EXECUTE) && writes_rd && !dec_is_load)
+                        || (state == S_LOAD_WB);
 
     // JAL/JALR link address: PC + instruction byte length
     // instr_len is in 16b parcels (1 or 2), shift left 1 to get bytes
     // TODO: Could make this easier to read.
     wire [31:0] pc_plus_ilen = pc_ext + {29'd0, dec_instr_len, 1'b0};
 
-    assign reg_wdata_nibble = (dec_is_jal || dec_is_jalr)
-                              ? pc_plus_ilen[{nibble_counter, 2'b00} +: 4]
-                              : result_nibble;
+    assign reg_wdata_nibble = (state == S_LOAD_WB) ? load_nibble
+                            : (dec_is_jal || dec_is_jalr) ? pc_plus_ilen[{nibble_counter, 2'b00} +: 4]
+                            : result_nibble;
 
     // Branch condition
     // TODO: Could make this easier to read.
@@ -193,6 +204,9 @@ module tinymoa_core (
             rs1_full       <= 32'd0;
             alu_result_full <= 32'd0;
             rs2_full       <= 32'd0;
+            load_data      <= 32'd0;
+            load_top_bit   <= 1'b0;
+            load_wb_count  <= 3'd0;
             mem_read       <= 1'b0;
             mem_write      <= 1'b0;
             mem_addr       <= 32'd0;
@@ -234,8 +248,6 @@ module tinymoa_core (
 
                     // Accumulate full ALU result (used as memory address for loads/stores)
                     alu_result_full[{nibble_counter, 2'b00} +: 4] <= alu_result_nibble;
-
-                    // Track ALU carry/compare across nibbles
                     alu_carry <= alu_carry_out;
                     alu_cmp   <= alu_cmp_out;
 
@@ -273,12 +285,25 @@ module tinymoa_core (
                         mem_read  <= 1'b0;
                         mem_write <= 1'b0;
                         if (dec_is_load) begin
-                            // Writeback loaded data
-                            // for now write nibble-serially in a sub-loop
+                            load_data <= mem_rdata;
+                            case (dec_mem_opcode[1:0])
+                                2'b00: load_top_bit <= ~dec_mem_opcode[2] & mem_rdata[7];   // LB sign
+                                2'b01: load_top_bit <= ~dec_mem_opcode[2] & mem_rdata[15];  // LH sign
+                                default: load_top_bit <= 1'b0;                               // LW
+                            endcase
+                            load_wb_count <= 3'd0;
+                            state <= S_LOAD_WB;
+                        end else begin
+                            state <= S_WRITEBACK;
                         end
-                        state <= S_WRITEBACK;
                     end
                 end
+                S_LOAD_WB: begin
+                    load_wb_count <= load_wb_count + 3'd1;
+                    if (load_wb_count == 3'd7)
+                        state <= S_WRITEBACK;
+                end
+
             endcase
         end
     end
