@@ -1,7 +1,7 @@
 [project]
-name = "TinyMOA-TestBench"
+name = "TinyMOA"
 version = "0.1.0"
-description = "Test package using CoboTB for TinyMOA"
+description = "Nibble-serial RV32EC CPU with compute-in-memory (CIM) accelerator."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
