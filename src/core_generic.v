@@ -210,7 +210,9 @@ module tinymoa_core_generic (
                     mem_write <= 1'b0;
                     mem_size <= 2'b10; // word fetch
                     if (mem_ready) begin
-                        instr_reg <= mem_rdata;
+                        // When PC[1]=1, the 16-bit compressed instruction sits in
+                        // the upper half of the fetched word — shift it into place.
+                        instr_reg <= pc[1] ? {16'd0, mem_rdata[31:16]} : mem_rdata;
                         mem_read  <= 1'b0;
                         state     <= S_DECODE;
                     end

@@ -21,7 +21,14 @@ module tb_core_generic (
     `endif
 
     reg [31:0] mem [0:255]; // 1KB word addressable
-    initial $readmemh("program.hex", mem);
+
+    // Memory is loaded by cocotb before nrst release.
+    // Initialize to zero so test_state_sequence (no program) gets defined values.
+    integer j;
+    initial begin
+        for (j = 0; j < 256; j = j + 1)
+            mem[j] = 32'h00000013; // NOP (ADDI x0, x0, 0)
+    end
 
     wire [31:0] mem_addr;
     wire        mem_read, mem_write;
@@ -31,7 +38,7 @@ module tb_core_generic (
     reg [31:0] mem_rdata;
     reg        mem_ready;
 
-    // Single cycle memory, always ready
+    // Single cycle memory — no array reset needed (cocotb handles program loading)
     always @(posedge clk) begin
         if (!nrst) begin
             mem_rdata <= 32'd0;
@@ -59,9 +66,8 @@ module tb_core_generic (
         .dbg_pc(dbg_pc)
     );
 
-    // Register probe: use the regfile's read port A during FETCH to sample a register
-    // The nibble_counter in the core rotates 0-7, and the regfile outputs one nibble
-    // per clock. We accumulate 8 nibbles to reconstruct the full 32-bit value.
+    // Register probe: continuously accumulate nibbles into probe_accum.
+    // Read reg_probe_val after at least 9 clocks to guarantee a full aligned window.
     wire [3:0] probe_nibble = core.regfile.register_access[reg_probe_sel];
     wire [2:0] probe_nc = core.nibble_counter;
     reg [31:0] probe_accum;

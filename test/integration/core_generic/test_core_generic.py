@@ -5,6 +5,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, RisingEdge
 
 import rv32i_encode as rv32i
+import rv32c_encode as rv32c
 
 NOP = rv32i.encode_addi(0, 0, 0)
 
@@ -53,8 +54,36 @@ async def run_instructions(dut, count):
 
 async def read_reg(dut, reg_num):
     dut.reg_probe_sel.value = reg_num
-    await ClockCycles(dut.clk, 8)
+    await ClockCycles(dut.clk, 9)  # 9 clocks guarantees a full 8-cycle aligned window
     return int(dut.reg_probe_val.value)
+
+
+async def setup_compressed(dut, c_instrs):
+    """Pack 16-bit C instructions two-per-word and load them.
+
+    Each pair (lo, hi) is stored as a single 32-bit word: word = (hi << 16) | lo.
+    The core uses pc[1] to select the upper or lower half on fetch.
+    """
+    words = []
+    for i in range(0, len(c_instrs), 2):
+        lo = c_instrs[i] & 0xFFFF
+        hi = (
+            (c_instrs[i + 1] & 0xFFFF)
+            if i + 1 < len(c_instrs)
+            else rv32c.encode_c_nop()
+        )
+        words.append((hi << 16) | lo)
+    await setup(dut, words)
+
+
+@cocotb.test()
+async def test_read_reg_sanity(dut):
+    """Does read_reg return the right value after a single ADDI?"""
+    await setup(dut, [rv32i.encode_addi(6, 0, 42)])
+    await run_instructions(dut, 1)
+    val = await read_reg(dut, 6)
+    dut._log.info(f"read_reg(6) after ADDI x6,x0,42 = {val}")
+    assert val == 42, f"read_reg broken: got {val}, expected 42"
 
 
 @cocotb.test()
@@ -126,8 +155,10 @@ async def test_addi_chain(dut):
     )
     await run_instructions(dut, 6)
 
-    assert await read_reg(dut, 5) == 5, f"x5: got {await read_reg(dut, 5)}, expected 5"
-    assert await read_reg(dut, 6) == 5, f"x6: got {await read_reg(dut, 6)}, expected 5"
+    x5 = await read_reg(dut, 5)
+    x6 = await read_reg(dut, 6)
+    assert x5 == 5, f"x5: got {x5}, expected 5"
+    assert x6 == 5, f"x6: got {x6}, expected 5"
 
 
 @cocotb.test()
@@ -162,3 +193,106 @@ async def test_alu_basic(dut):
         assert got == val, (
             f"x{reg}: got {got} ({hex(got)}), expected {val} ({hex(val)})"
         )
+
+
+@cocotb.test()
+async def test_fibonacci(dut):
+    """
+    Compute fib(12) = 144 using a branch loop
+
+    x5 = fib(n-2)
+    x6 = fib(n-1)
+    x7 = temp
+    x8 = loop counter
+    x9 = limit (12)
+
+    fib(0)=0, fib(1)=1, fib(2)=1, ... fib(12)=144
+
+    Program assembly:
+    (0x00)  ADDI x5, x0, 0       # a = 0
+    (0x04)  ADDI x6, x0, 1       # b = 1
+    (0x08)  ADDI x8, x0, 1       # i = 1
+    (0x0C)  ADDI x9, x0, 12      # n = 12
+    loop (0x10):
+        (0x10)  ADD  x7, x5, x6      # tmp = a + b
+        (0x14)  ADDI x5, x6, 0       # a = b
+        (0x18)  ADDI x6, x7, 0       # b = tmp
+        (0x1C)  ADDI x8, x8, 1       # i++
+        (0x20)  BNE  x8, x9, -16     # if i != n goto loop (0x20 + (-16) = 0x10)
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 0),
+            rv32i.encode_addi(6, 0, 1),
+            rv32i.encode_addi(8, 0, 1),
+            rv32i.encode_addi(9, 0, 12),
+            rv32i.encode_add(7, 5, 6),  # loop
+            rv32i.encode_addi(5, 6, 0),
+            rv32i.encode_addi(6, 7, 0),
+            rv32i.encode_addi(8, 8, 1),
+            rv32i.encode_bne(8, 9, -16),
+        ],
+    )
+
+    # 4 setup + 11 loop iterations * 5 instrs = 59 instructions
+    # (i goes 1,2,...,12: 11 taken branches + final BNE not taken still executes)
+    await run_instructions(dut, 59)
+
+    # Debug: read all fibonacci registers
+    pc = int(dut.dbg_pc.value)
+    dut._log.info(f"After fibonacci: PC={pc:#010x}")
+
+    for reg in [5, 6, 7, 8, 9]:
+        val = await read_reg(dut, reg)
+        dut._log.info(f"  x{reg} = {val} ({val:#010x})")
+
+    fib = await read_reg(dut, 6)
+    assert fib == 144, f"fib(12): got {fib}, expected 144 (0x{144:X})"
+
+
+@cocotb.test()
+async def test_fibonacci_compressed(dut):
+    """Compute fib(12) = 144 using RV32C compressed instructions.
+
+    Register assignment:
+      x8  = a (fib n-2), starts at 0
+      x9  = b (fib n-1), starts at 1
+      x10 = temp
+      x11 = loop counter, counts down from 11 to 0
+
+    After 11 iterations x9 = fib(12) = 144.
+
+    Byte layout (two C instructions packed per 32-bit word):
+      0x00  C.LI  x8,  0      a = 0
+      0x02  C.LI  x9,  1      b = 1
+      0x04  C.LI  x11, 11     counter = 11
+    loop:
+      0x06  C.MV  x10, x9     tmp = b
+      0x08  C.ADD x9,  x8     b += a
+      0x0A  C.MV  x8,  x10    a = tmp
+      0x0C  C.ADDI x11, -1    counter--
+      0x0E  C.BNEZ x11, -8    if counter != 0, goto 0x06
+    """
+    c_program = [
+        rv32c.encode_c_li(8, 0),  # C.LI  x8,  0
+        rv32c.encode_c_li(9, 1),  # C.LI  x9,  1
+        rv32c.encode_c_li(11, 11),  # C.LI  x11, 11
+        rv32c.encode_c_mv(10, 9),  # C.MV  x10, x9
+        rv32c.encode_c_add(9, 8),  # C.ADD x9,  x8
+        rv32c.encode_c_mv(8, 10),  # C.MV  x8,  x10
+        rv32c.encode_c_addi(11, -1),  # C.ADDI x11, -1
+        rv32c.encode_c_bnez(11, -8),  # C.BNEZ x11, -8
+    ]
+    await setup_compressed(dut, c_program)
+
+    # 3 setup instructions + 11 iterations × 5 instructions = 58 total
+    await run_instructions(dut, 58)
+
+    x8 = await read_reg(dut, 8)
+    x9 = await read_reg(dut, 9)
+    dut._log.info(
+        f"After compressed fibonacci: x8={x8} (fib(11)={89}), x9={x9} (fib(12)={144})"
+    )
+    assert x8 == 89, f"fib(11): got x8={x8}, expected 89"
+    assert x9 == 144, f"fib(12): got x9={x9}, expected 144"
