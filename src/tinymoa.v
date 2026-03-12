@@ -94,17 +94,16 @@ module tinymoa_top (
     end
 `endif
 
-    // QSPI controller
-    wire [31:0] qspi_rdata;
-    wire        qspi_ready;
-    wire [3:0]  spi_data_in;
-    wire [3:0]  spi_data_out_w;
-    wire [3:0]  spi_data_oe_w;
-    wire        spi_clk_out;
-    wire        spi_flash_cs_n;
-    wire        spi_ram_a_cs_n;
-    wire        spi_ram_b_cs_n;
-
+    // QSPI controller stubbed out for initial GDS generation
+    wire [31:0] qspi_rdata  = 32'd0;
+    wire        qspi_ready  = 1'b0;
+    wire [3:0]  spi_data_out_w = 4'hF;
+    wire [3:0]  spi_data_oe_w  = 4'b0;
+    wire        spi_clk_out    = 1'b0;
+    wire        spi_flash_cs_n = 1'b1;
+    wire        spi_ram_a_cs_n = 1'b1;
+    wire        spi_ram_b_cs_n = 1'b1;
+    /*
     qspi_controller qspi (
         .clk           (clk),
         .rst_n         (rst_n),
@@ -123,6 +122,7 @@ module tinymoa_top (
         .spi_ram_a_cs_n(spi_ram_a_cs_n),
         .spi_ram_b_cs_n(spi_ram_b_cs_n)
     );
+    */
 
     // Peripherals
     // TODO: CIM, UART, GPIO
@@ -174,6 +174,7 @@ module tinymoa_top (
         1'b1                 // [0] CS always output
     };
 
-    assign spi_data_in = {uio_in[5], uio_in[4], uio_in[2], uio_in[1]};
+    // assign spi_data_in = {uio_in[5], uio_in[4], uio_in[2], uio_in[1]};
+    wire _unused = &{uio_in, 1'b0};
     assign uo_out = {dbg_state, dbg_pc[4:0]};
 endmodule
