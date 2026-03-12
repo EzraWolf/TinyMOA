@@ -90,6 +90,21 @@ def test_csr():
 #     run_unit_test("placeholder", "placeholder", test_type="integration")
 
 
+def test_core():
+    run_unit_test(
+        "core",
+        "core",
+        test_type="integration",
+        extra_sources=[
+            "decoder.v",
+            "registers.v",
+            "alu/alu.v",
+            "alu/shifter.v",
+            "alu/multiplier.v",
+        ],
+    )
+
+
 def test_core_generic():
     run_unit_test(
         "core_generic",
