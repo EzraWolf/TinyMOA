@@ -173,7 +173,7 @@ module tinymoa_top (
     // Memory response mux
     always @(*) begin
         if (is_sram) begin
-            core_rdata = sram_rdata;
+            core_rdata = sram_a_dout;
             core_ready = sram_ready;
         end else if (is_qspi) begin
             core_rdata = qspi_rdata;
