@@ -90,7 +90,7 @@ module tinymoa_top (
 
         .B_BIST_CLK (1'b0),
         .B_BIST_EN  (1'b0),
-        .B_BIST_M   (1'b0),
+        .B_BIST_MEN (1'b0),
         .B_BIST_WEN (1'b0),
         .B_BIST_REN (1'b0),
         .B_BIST_ADDR(9'd0),
