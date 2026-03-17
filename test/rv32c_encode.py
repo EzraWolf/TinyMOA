@@ -495,3 +495,14 @@ def encode_c_add(rd, rs2):
     C.ADD rd, rs2
     """
     return encode_cr_type(0b1001, rd, rs2, 0b10)
+
+
+def encode_c_mul(rd, rs2):
+    """
+    Compressed Multiply (TinyMOA custom, Q2 funct3=101)
+    C.MUL rd, rs2   →   rd = rd * rs2[15:0]
+
+    Encoding: instr[15:13]=101, instr[1:0]=10, rd in [10:7], rs2 in [5:2].
+    Uses full 4-bit register fields (not compressed 3-bit rs1'/rs2').
+    """
+    return (0b101 << 13) | (rd << 7) | (rs2 << 2) | 0b10

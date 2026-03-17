@@ -15,9 +15,17 @@ S_EXECUTE = 2
 S_WRITEBACK = 3
 S_MEM = 4
 S_LOAD_WB = 5
+S_EX2 = 6  # Second execute pass for MUL/SHIFT/SLT
 
 
-async def setup(dut, program=None):
+async def setup(dut, program=None, data=None):
+    """Initialize the core testbench.
+
+    program: list of 32-bit instruction words loaded starting at address 0.
+             Remaining memory is filled with NOPs.
+    data:    dict of {word_index: value} for pre-loading data words (e.g. for
+             sub-word load tests). Applied after program loading, before nrst.
+    """
     clock = Clock(dut.clk, 8, unit="ns")
     cocotb.start_soon(clock.start())
     dut.nrst.value = 0
@@ -35,6 +43,10 @@ async def setup(dut, program=None):
         dut._log.info(
             f"mem[0] readback: {readback:#010x}, expected: {program[0]:#010x}"
         )
+
+    if data:
+        for word_idx, value in data.items():
+            dut.mem[word_idx].value = value
 
     dut.nrst.value = 1
 
@@ -381,3 +393,526 @@ async def test_load_store_computed(dut):
         got = await read_reg(dut, reg)
         dut._log.info(f"  x{reg} = {got} ({got:#010x}), expected {val} ({val:#010x})")
         assert got == val, f"x{reg}: got {got}, expected {val}"
+
+
+# =============================================================================
+# LUI / AUIPC
+# =============================================================================
+
+
+@cocotb.test()
+async def test_lui_auipc(dut):
+    """LUI loads a 20-bit upper immediate. AUIPC adds it to the instruction's PC.
+
+    Program:
+      0x00  LUI   x5, 0x12345   x5 = 0x12345000
+      0x04  AUIPC x6, 1         x6 = PC + 0x1000 = 0x04 + 0x1000 = 0x1004
+      0x08  AUIPC x7, 0         x7 = PC = 0x08  (upper imm=0 -> adds 0)
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_lui(5, 0x12345),
+            rv32i.encode_auipc(6, 1),
+            rv32i.encode_auipc(7, 0),
+        ],
+    )
+    await run_instructions(dut, 3)
+
+    x5 = await read_reg(dut, 5)
+    x6 = await read_reg(dut, 6)
+    x7 = await read_reg(dut, 7)
+    dut._log.info(f"x5={x5:#010x} x6={x6:#010x} x7={x7:#010x}")
+    assert x5 == 0x12345000, f"LUI: got {x5:#010x}, expected 0x12345000"
+    assert x6 == 0x1004, f"AUIPC x6: got {x6:#010x}, expected 0x00001004"
+    assert x7 == 0x0008, f"AUIPC x7: got {x7:#010x}, expected 0x00000008"
+
+
+# Shifts (via S_EX2 with fully-assembled rs1_full)
+@cocotb.test()
+async def test_shifts_immediate(dut):
+    """Immediate shifts: SLLI, SRLI, SRAI.
+
+    Uses x5=0x80000001 as the test value to cover both MSB and LSB simultaneously.
+    Constructs x5 via: LUI x5, 0x80000 -> x5=0x80000000, then ADDI x5, x5, 1.
+
+    Expected:
+      SLLI x6, x5, 1  -> 0x80000001 << 1 = 0x00000002  (left shift, MSB dropped)
+      SRLI x7, x5, 1  -> 0x80000001 >> 1 = 0x40000000  (logical, zero-fill MSB)
+      SRAI x8, x5, 1  -> 0x80000001 >> 1 = 0xC0000000  (arithmetic, sign-fill MSB)
+      SLLI x9, x5, 4  -> 0x80000001 << 4 = 0x00000010
+      SRLI x10, x5, 4 -> 0x80000001 >> 4 = 0x08000000  (logical)
+      SRAI x10... reuse register — use x5 = 0xF0000000 for last two
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_lui(5, 0x80000),  # x5 = 0x80000000
+            rv32i.encode_addi(5, 5, 1),  # x5 = 0x80000001
+            rv32i.encode_slli(6, 5, 1),  # x6 = 0x80000001 << 1 = 0x00000002
+            rv32i.encode_srli(7, 5, 1),  # x7 = 0x80000001 >> 1 = 0x40000000 (logical)
+            rv32i.encode_srai(8, 5, 1),  # x8 = 0x80000001 >> 1 = 0xC0000000 (arith)
+            rv32i.encode_slli(9, 5, 4),  # x9 = 0x80000001 << 4 = 0x00000010
+            rv32i.encode_srli(
+                10, 5, 28
+            ),  # x10 = 0x80000001 >> 28 = 0x00000008 (logical)
+            rv32i.encode_srai(
+                11, 5, 28
+            ),  # x11 = 0x80000001 >> 28 arithmetic = 0xFFFFFFF8
+            # bits[31:28] of original = 1000b = 8; upper 28 positions filled with sign=1
+        ],
+    )
+    await run_instructions(dut, 8)
+
+    expected = {
+        5: 0x80000001,
+        6: 0x00000002,
+        7: 0x40000000,
+        8: 0xC0000000,
+        9: 0x00000010,
+        10: 0x00000008,
+        11: 0xFFFFFFF8,
+    }
+    for reg, val in expected.items():
+        got = await read_reg(dut, reg)
+        dut._log.info(f"  x{reg} = {got:#010x}, expected {val:#010x}")
+        assert got == val, f"x{reg}: got {got:#010x}, expected {val:#010x}"
+
+
+@cocotb.test()
+async def test_shifts_register(dut):
+    """Register shifts: SLL, SRL, SRA.
+
+    Shift amount is taken from rs2[4:0], which is the register VALUE (not register number).
+    Uses small shift amounts to avoid register-number coincidence.
+
+    x5 = 0x80000001 (test value)
+    x6 = 3          (shift amount)
+
+    Expected:
+      SLL x7, x5, x6  -> 0x80000001 << 3 = 0x00000008
+      SRL x8, x5, x6  -> 0x80000001 >> 3 = 0x10000000 (logical)
+      SRA x9, x5, x6  -> 0x80000001 >> 3 = 0xF0000000 (arithmetic)
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_lui(5, 0x80000),
+            rv32i.encode_addi(5, 5, 1),  # x5 = 0x80000001
+            rv32i.encode_addi(6, 0, 3),  # x6 = 3 (shift amount)
+            rv32i.encode_sll(7, 5, 6),  # x7 = x5 << x6 = 0x80000001 << 3 = 0x00000008
+            rv32i.encode_srl(8, 5, 6),  # x8 = x5 >> x6 (logical) = 0x10000000
+            rv32i.encode_sra(9, 5, 6),  # x9 = x5 >> x6 (arith)   = 0xF0000000
+        ],
+    )
+    await run_instructions(dut, 6)
+
+    expected = {5: 0x80000001, 6: 3, 7: 0x00000008, 8: 0x10000000, 9: 0xF0000000}
+    for reg, val in expected.items():
+        got = await read_reg(dut, reg)
+        dut._log.info(f"  x{reg} = {got:#010x}, expected {val:#010x}")
+        assert got == val, f"x{reg}: got {got:#010x}, expected {val:#010x}"
+
+
+# =============================================================================
+# SLT / SLTU (via S_EX2 with final alu_cmp)
+# =============================================================================
+
+
+@cocotb.test()
+async def test_slt_sltu(dut):
+    """SLT/SLTU: set rd=1 if rs1 < rs2, else rd=0.
+
+    Key cases:
+      SLT  (-1, 0)  -> 1  (-1 is less than 0 signed)
+      SLT  (0, -1)  -> 0  (0 is NOT less than -1 signed)
+      SLTU (-1, 0)  -> 0  (0xFFFFFFFF is NOT less than 0 unsigned)
+      SLTU (0, -1)  -> 1  (0 IS less than 0xFFFFFFFF unsigned)
+      SLTI (x, 5)   -> 1  if x < 5 signed
+      SLTIU(x, 5)   -> 1  if x < 5 unsigned
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, -1),  # x5 = 0xFFFFFFFF (-1 signed)
+            rv32i.encode_addi(6, 0, 0),  # x6 = 0
+            rv32i.encode_slt(7, 5, 6),  # x7  = (-1 < 0  signed)   = 1
+            rv32i.encode_slt(8, 6, 5),  # x8  = (0  < -1 signed)   = 0
+            rv32i.encode_sltu(
+                9, 5, 6
+            ),  # x9  = (-1 < 0  unsigned) = 0  (0xFFFFFFFF > 0)
+            rv32i.encode_sltu(
+                10, 6, 5
+            ),  # x10 = (0  < -1 unsigned) = 1  (0 < 0xFFFFFFFF)
+            rv32i.encode_addi(11, 0, 3),  # x11 = 3
+            rv32i.encode_slti(12, 11, 5),  # x12 = (3 < 5  signed)   = 1
+            rv32i.encode_slti(13, 5, 5),  # x13 = (-1 < 5 signed)   = 1
+            rv32i.encode_sltiu(14, 6, 1),  # x14 = (0 < 1  unsigned) = 1
+            rv32i.encode_sltiu(15, 5, 1),  # x15 = (0xFFFFFFFF < 1 unsigned) = 0
+        ],
+    )
+    await run_instructions(dut, 11)
+
+    expected = {7: 1, 8: 0, 9: 0, 10: 1, 12: 1, 13: 1, 14: 1, 15: 0}
+    for reg, val in expected.items():
+        got = await read_reg(dut, reg)
+        dut._log.info(f"  x{reg} = {got}, expected {val}")
+        assert got == val, f"x{reg}: got {got}, expected {val}"
+
+
+# Branches
+@cocotb.test()
+async def test_beq(dut):
+    """BEQ: taken when rs1 == rs2, not-taken otherwise.
+
+    Taken path:  x5 = x6 = 5 -> branch skips ADDI x7, x0, 99 -> x7 stays 42
+    Not-taken path: x5=5, x6=6 -> falls through to ADDI x7, x0, 99 -> x7 = 99
+
+    Note: registers are NOT reset on nrst (no reset in register file), so x7 must
+    be written explicitly before the branch to have a known sentinel value.
+    """
+    # --- Taken ---
+    # 0x00 ADDI x5, x0, 5
+    # 0x04 ADDI x6, x0, 5
+    # 0x08 ADDI x7, x0, 42    x7 = 42 (sentinel, must not change if branch taken)
+    # 0x0C BEQ  x5, x6, +8    target = 0x14 (skips 0x10)
+    # 0x10 ADDI x7, x0, 99    skipped
+    # 0x14 ADDI x8, x0, 1     executed
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 5),
+            rv32i.encode_addi(6, 0, 5),
+            rv32i.encode_addi(7, 0, 42),
+            rv32i.encode_beq(5, 6, 8),
+            rv32i.encode_addi(7, 0, 99),
+            rv32i.encode_addi(8, 0, 1),
+        ],
+    )
+    await run_instructions(dut, 5)  # ADDI x5, x6, x7=42, BEQ(taken), ADDI x8=1
+    x7 = await read_reg(dut, 7)
+    x8 = await read_reg(dut, 8)
+    assert x7 == 42, f"BEQ taken: x7 was overwritten: got {x7}, expected 42"
+    assert x8 == 1, f"BEQ taken: branch target not reached: x8={x8}"
+
+    # Not-taken
+    # 0x00 ADDI x5, x0, 5
+    # 0x04 ADDI x6, x0, 6
+    # 0x08 ADDI x7, x0, 42  ->  x7 = 42 (sentinel)
+    # 0x0C BEQ  x5, x6, +8  ->  not taken (5 != 6), falls through to 0x10
+    # 0x10 ADDI x7, x0, 99  ->  executed
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 5),
+            rv32i.encode_addi(6, 0, 6),
+            rv32i.encode_addi(7, 0, 42),
+            rv32i.encode_beq(5, 6, 8),
+            rv32i.encode_addi(7, 0, 99),
+        ],
+    )
+    await run_instructions(dut, 5)  # ADDI x5, x6, x7=42, BEQ(not-taken), ADDI x7=99
+    x7 = await read_reg(dut, 7)
+    assert x7 == 99, f"BEQ not-taken: x7 should be 99, got {x7}"
+
+
+@cocotb.test()
+async def test_bne(dut):
+    """BNE: taken when rs1 != rs2.
+
+    Taken:     x5=5, x6=6 -> branch taken, ADDI x7 at +8 executed
+    Not-taken: x5=5, x6=5 -> falls through, ADDI x7 at +4 executed
+    """
+    # --- Taken ---
+    # 0x08 BNE x5, x6, +8 -> target = 0x10
+    # 0x0C ADDI x7, x0, 0    skipped
+    # 0x10 ADDI x7, x0, 1    executed
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 5),
+            rv32i.encode_addi(6, 0, 6),
+            rv32i.encode_bne(5, 6, 8),
+            rv32i.encode_addi(7, 0, 0),
+            rv32i.encode_addi(7, 0, 1),
+        ],
+    )
+    await run_instructions(dut, 4)  # setup x5, x6, BNE(taken), ADDI x7=1
+    x7 = await read_reg(dut, 7)
+    assert x7 == 1, f"BNE taken: x7 should be 1, got {x7}"
+
+    # --- Not-taken ---
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 5),
+            rv32i.encode_addi(6, 0, 5),
+            rv32i.encode_bne(5, 6, 8),
+            rv32i.encode_addi(7, 0, 42),  # executed (fall through)
+            rv32i.encode_addi(7, 0, 1),  # NOT executed
+        ],
+    )
+    await run_instructions(dut, 4)  # setup x5, x6, BNE (not taken), ADDI x7=42
+    x7 = await read_reg(dut, 7)
+    assert x7 == 42, f"BNE not-taken: x7 should be 42, got {x7}"
+
+
+@cocotb.test()
+async def test_blt_bge(dut):
+    """BLT/BGE: signed comparisons.
+
+    BLT taken:  -1 < 0  (signed)
+    BGE taken:   0 >= -1 (signed)
+    BLT not-taken: 0 is NOT < -1 (signed, 0 > -1)
+    """
+    # BLT taken: x5=-1, x6=0, -1 < 0 then branch
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, -1),
+            rv32i.encode_addi(6, 0, 0),
+            rv32i.encode_blt(5, 6, 8),  # -1 < 0: taken
+            rv32i.encode_addi(7, 0, 0),  # skipped
+            rv32i.encode_addi(7, 0, 1),  # executed
+        ],
+    )
+    await run_instructions(dut, 4)
+    x7 = await read_reg(dut, 7)
+    assert x7 == 1, f"BLT taken: got {x7}, expected 1"
+
+    # BLT not-taken: x5=0, x6=-1, 0 < -1 is false signed
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 0),
+            rv32i.encode_addi(6, 0, -1),
+            rv32i.encode_blt(5, 6, 8),  # 0 < -1: NOT taken
+            rv32i.encode_addi(7, 0, 42),  # executed
+            rv32i.encode_addi(7, 0, 1),  # not reached
+        ],
+    )
+    await run_instructions(dut, 4)
+    x7 = await read_reg(dut, 7)
+    assert x7 == 42, f"BLT not-taken: got {x7}, expected 42"
+
+    # BGE taken: x5=0, x6=-1, 0 >= -1 signed -> taken
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 0),
+            rv32i.encode_addi(6, 0, -1),
+            rv32i.encode_bge(5, 6, 8),  # 0 >= -1: taken
+            rv32i.encode_addi(7, 0, 0),  # skipped
+            rv32i.encode_addi(7, 0, 1),  # executed
+        ],
+    )
+    await run_instructions(dut, 4)
+    x7 = await read_reg(dut, 7)
+    assert x7 == 1, f"BGE taken: got {x7}, expected 1"
+
+
+@cocotb.test()
+async def test_bltu_bgeu(dut):
+    """BLTU/BGEU: unsigned comparisons.
+
+    BLTU taken:  0 < 1 unsigned
+    BGEU taken:  0xFFFFFFFF >= 1 unsigned
+    BLTU not-taken: 0xFFFFFFFF is NOT < 1 unsigned
+    """
+    # BLTU taken: 0 < 1
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 0),
+            rv32i.encode_addi(6, 0, 1),
+            rv32i.encode_bltu(5, 6, 8),  # 0 < 1 unsigned: taken
+            rv32i.encode_addi(7, 0, 0),  # skipped
+            rv32i.encode_addi(7, 0, 1),  # executed
+        ],
+    )
+    await run_instructions(dut, 4)
+    x7 = await read_reg(dut, 7)
+    assert x7 == 1, f"BLTU taken: got {x7}, expected 1"
+
+    # BLTU not-taken: 0xFFFFFFFF >= 1 unsigned, so 0xFFFFFFFF < 1 is false
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, -1),  # x5 = 0xFFFFFFFF
+            rv32i.encode_addi(6, 0, 1),
+            rv32i.encode_bltu(5, 6, 8),  # 0xFFFFFFFF < 1 unsigned: NOT taken
+            rv32i.encode_addi(7, 0, 42),  # executed
+            rv32i.encode_addi(7, 0, 1),  # not reached
+        ],
+    )
+    await run_instructions(dut, 4)
+    x7 = await read_reg(dut, 7)
+    assert x7 == 42, f"BLTU not-taken: got {x7}, expected 42"
+
+    # BGEU taken: 0xFFFFFFFF >= 1 unsigned
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, -1),  # x5 = 0xFFFFFFFF
+            rv32i.encode_addi(6, 0, 1),
+            rv32i.encode_bgeu(5, 6, 8),  # 0xFFFFFFFF >= 1 unsigned: taken
+            rv32i.encode_addi(7, 0, 0),  # skipped
+            rv32i.encode_addi(7, 0, 1),  # executed
+        ],
+    )
+    await run_instructions(dut, 4)
+    x7 = await read_reg(dut, 7)
+    assert x7 == 1, f"BGEU taken: got {x7}, expected 1"
+
+
+# JAL / JALR
+@cocotb.test()
+async def test_jal(dut):
+    """JAL: jumps and writes return address to rd.
+
+    Program:
+      0x00  ADDI x5, x0, 0     x5 = 0 (sentinel, should stay 0)
+      0x04  JAL  x1, +8        x1 = 0x08 (return addr = PC+4), jump to 0x0C
+      0x08  ADDI x5, x0, 99    skipped
+      0x0C  ADDI x6, x0, 1     executed (branch target)
+    """
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 0),
+            rv32i.encode_jal(1, 8),
+            rv32i.encode_addi(5, 0, 99),
+            rv32i.encode_addi(6, 0, 1),
+        ],
+    )
+    await run_instructions(dut, 3)  # ADDI x5, JAL, ADDI x6
+
+    x1 = await read_reg(dut, 1)
+    x5 = await read_reg(dut, 5)
+    x6 = await read_reg(dut, 6)
+    dut._log.info(f"x1={x1:#010x} x5={x5} x6={x6}")
+    assert x1 == 0x08, f"JAL: x1 (return addr) = {x1:#010x}, expected 0x00000008"
+    assert x5 == 0, f"JAL: skipped instr ran: x5={x5}, expected 0"
+    assert x6 == 1, f"JAL: branch target not reached: x6={x6}, expected 1"
+
+
+@cocotb.test()
+async def test_jalr(dut):
+    """JALR: jumps to rs1+imm (bit 0 cleared), writes return address to rd.
+
+    Program:
+      0x00  ADDI x5, x0, 0x1C  x5 = 28 = 0x1C (jump target)
+      0x04  JALR x1, x5, 0     x1 = 0x08 (return addr), PC = x5 = 0x1C
+      0x08-0x18                 skipped (6 instructions = NOPs)
+      0x1C  ADDI x7, x0, 1     executed (jump target = word index 7)
+    """
+    program = [NOP] * 8
+    program[0] = rv32i.encode_addi(5, 0, 0x1C)
+    program[1] = rv32i.encode_jalr(1, 5, 0)
+    # program[2..6] are NOPs
+    program[7] = rv32i.encode_addi(7, 0, 1)
+    await setup(dut, program)
+    await run_instructions(dut, 3)  # ADDI x5, JALR, ADDI x7
+
+    x1 = await read_reg(dut, 1)
+    x7 = await read_reg(dut, 7)
+    dut._log.info(f"x1={x1:#010x} x7={x7}")
+    assert x1 == 0x08, f"JALR: x1 (return addr) = {x1:#010x}, expected 0x00000008"
+    assert x7 == 1, f"JALR: branch target not reached: x7={x7}, expected 1"
+
+
+# Sub-word loads (LB/LBU/LH/LHU at word-aligned offset 0)
+@cocotb.test()
+async def test_load_subword(dut):
+    """LBU/LB/LHU/LH: verify byte and halfword extraction and sign/zero extension.
+
+    Pre-loads mem[32] (byte address 0x80) with 0x00008180:
+      byte[0] at 0x80 = 0x80  (bit 7=1: LB sign-extends to 0xFFFFFF80)
+      byte[1] at 0x81 = 0x81  (bit 7=1: LB sign-extends to 0xFFFFFF81)
+      half[0] at 0x80 = 0x8180 (bit 15=1: LH sign-extends to 0xFFFF8180)
+
+    All loads are at offset 0 from the word-aligned base address 0x80.
+    """
+    # x6 = 0x80 (base address for all loads)
+    program = [
+        rv32i.encode_addi(6, 0, 0x80),  # x6 = 0x80
+        rv32i.encode_lbu(5, 6, 0),  # x5 = LBU: byte[0x80] = 0x80 -> 0x00000080
+        rv32i.encode_lb(7, 6, 0),  # x7 = LB:  byte[0x80] = 0x80 -> 0xFFFFFF80
+        rv32i.encode_lhu(8, 6, 0),  # x8 = LHU: half[0x80] = 0x8180 -> 0x00008180
+        rv32i.encode_lh(9, 6, 0),  # x9 = LH:  half[0x80] = 0x8180 -> 0xFFFF8180
+        rv32i.encode_lw(10, 6, 0),  # x10 = LW: word[0x80] = 0x00008180
+    ]
+    # word index 32 = byte address 0x80
+    await setup(dut, program, data={32: 0x00008180})
+    await run_instructions(dut, len(program))
+
+    expected = {
+        5: 0x00000080,
+        7: 0xFFFFFF80,
+        8: 0x00008180,
+        9: 0xFFFF8180,
+        10: 0x00008180,
+    }
+    for reg, val in expected.items():
+        got = await read_reg(dut, reg)
+        dut._log.info(f"  x{reg} = {got:#010x}, expected {val:#010x}")
+        assert got == val, f"x{reg}: got {got:#010x}, expected {val:#010x}"
+
+
+# C.MUL (via S_EX2 EX2_MUL path)
+@cocotb.test()
+async def test_c_mul(dut):
+    """C.MUL rd, rs2: rd = rd * rs2[15:0] (lower 32 bits of 32x16 product).
+
+    Uses setup_compressed to pack 16-bit instructions into 32-bit words.
+
+    Program:
+      C.LI  x5, 6     x5 = 6
+      C.LI  x6, 7     x6 = 7
+      C.MUL x5, x6    x5 = 6 * 7 = 42
+      C.NOP
+    """
+    c_program = [
+        rv32c.encode_c_li(5, 6),
+        rv32c.encode_c_li(6, 7),
+        rv32c.encode_c_mul(5, 6),
+        rv32c.encode_c_nop(),
+    ]
+    await setup_compressed(dut, c_program)
+    await run_instructions(dut, 4)
+
+    x5 = await read_reg(dut, 5)
+    x6 = await read_reg(dut, 6)
+    dut._log.info(f"C.MUL: x5={x5} (expected 42), x6={x6} (expected 7)")
+    assert x5 == 42, f"C.MUL: got {x5}, expected 42 (6 * 7)"
+    assert x6 == 7, f"C.MUL: x6 was modified: got {x6}, expected 7"
+
+
+@cocotb.test()
+async def test_c_mul_larger(dut):
+    """C.MUL with larger values: 100 * 200 = 20000.
+
+    Built with 32-bit setup instructions (ADDI), then packed C.MUL.
+    The program mixes 32-bit and 16-bit instructions so we place C.MUL
+    at word-aligned boundary after the 32-bit setup.
+
+    Program (32-bit words):
+      0x00  ADDI x5, x0, 100   (32b)
+      0x04  ADDI x6, x0, 200   (32b)
+      0x08  C.MUL x5, x6       (16b, low half of word)
+            C.NOP               (16b, high half of word)
+    """
+    mul_word = (rv32c.encode_c_nop() << 16) | rv32c.encode_c_mul(5, 6)
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 100),
+            rv32i.encode_addi(6, 0, 200),
+            mul_word,
+        ],
+    )
+    await run_instructions(dut, 4)  # ADDI x5, ADDI x6, C.MUL, C.NOP
+
+    x5 = await read_reg(dut, 5)
+    dut._log.info(f"C.MUL larger: x5={x5} (expected 20000)")
+    assert x5 == 20000, f"C.MUL 100*200: got {x5}, expected 20000"

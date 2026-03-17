@@ -17,15 +17,24 @@ module tinymoa_core (
     output wire [2:0] dbg_state,
     output wire [23:0] dbg_pc
 );
-    localparam S_FETCH    = 3'd0;
-    localparam S_DECODE   = 3'd1;
-    localparam S_EXECUTE  = 3'd2;
+    localparam S_FETCH     = 3'd0;
+    localparam S_DECODE    = 3'd1;
+    localparam S_EXECUTE   = 3'd2;
     localparam S_WRITEBACK = 3'd3;
-    localparam S_MEM      = 3'd4;
-    localparam S_LOAD_WB  = 3'd5;
-    localparam S_MUL      = 3'd6; // Second execute pass for C.MUL with correct b_in
+    localparam S_MEM       = 3'd4;
+    localparam S_LOAD_WB   = 3'd5;
+
+    // S_EX2: second 8-cycle execute pass for instructions that need fully-assembled
+    // rs1_full / rs2_full / alu_cmp. Selects operation via ex2_type latch
+    localparam S_EX2       = 3'd6;
+
+    // ex2_type selects what S_EX2 computes
+    localparam EX2_MUL   = 2'd0; // C.MUL: multiplier with b_in=rs2_full[15:0]
+    localparam EX2_SHIFT = 2'd1; // SLL/SRL/SRA/SLLI/SRLI/SRAI: barrel shifter with rs1_full
+    localparam EX2_SLT   = 2'd2; // SLT/SLTU/SLTI/SLTIU: write {3'b0, alu_cmp} at nc=0
 
     reg [2:0] state;
+    reg [1:0] ex2_type;
     reg [2:0] nibble_counter;
 
     assign dbg_state = state;
@@ -117,32 +126,47 @@ module tinymoa_core (
         .carry_out(alu_carry_out)
     );
 
-    // Shifter needs full 32b input, accumulated during EXECUTE
+    // rs1_full / rs2_full are assembled nibble-by-nibble during S_EXECUTE.
+    // Required by the shifter (needs complete rs1), multiplier (needs complete rs2),
+    // and store data path. Not valid until S_EXECUTE completes (nc=7).
     reg [31:0] rs1_full;
     reg [31:0] rs2_full;
+
+    // Instruction classification (combinational on decoder outputs)
+    wire is_shift = (dec_alu_opcode[2:0] == 3'b001) || (dec_alu_opcode[2:0] == 3'b101);
+    wire is_mul   = (dec_alu_opcode == 4'b1010);
+    wire is_slt   = (dec_alu_opcode[2:1] == 2'b01); // SLT or SLTU
+
+    // Instructions that need a second execute pass (S_EX2) because their result
+    // depends on rs1_full / rs2_full / alu_cmp which are only complete after nc=7.
+    wire is_ex2_needed = is_mul
+        || (is_shift && (dec_is_alu_reg || dec_is_alu_imm))
+        || (is_slt   && (dec_is_alu_reg || dec_is_alu_imm));
+
+    // Shifter: shift amount from rs2 value (R-type) or immediate (I-type).
+    // Both rs2_full and dec_imm are correct sources; rs2_full is only valid in S_EX2.
+    wire [4:0] shift_amnt_w = (is_shift && dec_is_alu_reg) ? rs2_full[4:0] : dec_imm[4:0];
     wire [3:0] shifter_result_nibble;
 
     tinymoa_shifter shifter (
         .opcode(dec_alu_opcode[3:2]),
         .nibble_counter(nibble_counter),
         .data_in(rs1_full),
-        .shift_amnt(dec_imm[4:0]),
+        .shift_amnt(shift_amnt_w),
         .result(shifter_result_nibble)
     );
 
-    // Detect MUL at end of S_EXECUTE to reset multiplier accumulator
-    wire is_shift = (dec_alu_opcode[2:0] == 3'b001) || (dec_alu_opcode[2:0] == 3'b101);
-    wire is_mul   = (dec_alu_opcode == 4'b1010);
-    wire mul_clr  = (state == S_EXECUTE) && (nibble_counter == 3'd7) && is_mul;
-
-    // Multiplier
+    // Multiplier: reset accumulator at the nc=7 boundary of S_EXECUTE→S_EX2(MUL).
+    // S_EX2 starts at nc=0 with a clean accumulator and correct b_in=rs2_full[15:0].
+    wire mul_clr = (state == S_EXECUTE) && (nibble_counter == 3'd7) && is_mul;
     wire [3:0] mul_result_nibble;
+
     tinymoa_multiplier #(.B_IN_WIDTH(16)) multiplier (
         .clk(clk),
         .nrst(nrst),
         .mul_clr(mul_clr),
         .a_in(reg_rs1_nibble),
-        .b_in(rs2_full[15:0]),  // Lower 16 bits of rs2; valid at start of S_MUL
+        .b_in(rs2_full[15:0]),
         .product(mul_result_nibble)
     );
 
@@ -156,67 +180,73 @@ module tinymoa_core (
     wire [3:0] load_nibble = load_past_boundary ? {4{load_top_bit}}
                                                 : load_data[{nibble_counter, 2'b00} +: 4];
 
-    // ALU result mux
+    // ALU result mux for the standard (non-EX2) writeback path
+    // Only used during S_EXECUTE when is_ex2_needed=0
     reg [31:0] alu_result_full;
-    wire is_slt   = (dec_alu_opcode[2:1] == 2'b01);  // SLT or SLTU
-
     reg [3:0] result_nibble;
     always @(*) begin
         if (dec_is_lui)
             result_nibble = dec_imm[{nibble_counter, 2'b00} +: 4];
-        else if (is_shift && (dec_is_alu_reg || dec_is_alu_imm))
-            result_nibble = shifter_result_nibble;
-        else if (is_mul)
-            result_nibble = mul_result_nibble;
-        else if (is_slt && (dec_is_alu_reg || dec_is_alu_imm))
-            result_nibble = (nibble_counter == 3'd0) ? {3'b0, alu_cmp} : 4'd0;
         else
             result_nibble = alu_result_nibble;
     end
 
-    // Writeback control
-    // TODO: Could make this easier to read.
+    // S_EX2 result mux: selects output nibble based on ex2_type latch.
+    reg [3:0] ex2_nibble;
+    always @(*) begin
+        case (ex2_type)
+            EX2_MUL:   ex2_nibble = mul_result_nibble;
+            EX2_SHIFT: ex2_nibble = shifter_result_nibble;
+            EX2_SLT:   ex2_nibble = (nibble_counter == 3'd0) ? {3'b0, alu_cmp} : 4'd0;
+            default:   ex2_nibble = 4'd0;
+        endcase
+    end
+
+    // Writeback control:
+    // - Standard ALU/LUI/AUIPC/JAL/JALR write during S_EXECUTE (excluding ex2 cases)
+    // - Load writeback uses S_LOAD_WB
+    // - MUL/SHIFT/SLT writeback uses S_EX2
     wire writes_rd = dec_is_alu_reg || dec_is_alu_imm || dec_is_lui || dec_is_auipc
                    || dec_is_jal || dec_is_jalr || dec_is_load;
-    assign reg_write_en = ((state == S_EXECUTE) && writes_rd && !dec_is_load && !is_mul)
+    assign reg_write_en = ((state == S_EXECUTE) && writes_rd && !dec_is_load && !is_ex2_needed)
                         || (state == S_LOAD_WB)
-                        || (state == S_MUL);
+                        || (state == S_EX2);
 
     // JAL/JALR link address: PC + instruction byte length
     wire [23:0] pc_plus_ilen = pc + {21'd0, dec_instr_len, 1'b0};
     wire [3:0] pc_plus_ilen_nibble = (nibble_counter < 3'd6)
                                    ? pc_plus_ilen[{nibble_counter, 2'b00} +: 4] : 4'd0;
 
-    assign reg_wdata_nibble = (state == S_LOAD_WB) ? load_nibble
-                            : (state == S_MUL)    ? mul_result_nibble
-                            : (dec_is_jal || dec_is_jalr) ? pc_plus_ilen_nibble
+    assign reg_wdata_nibble = (state == S_LOAD_WB)              ? load_nibble
+                            : (state == S_EX2)                  ? ex2_nibble
+                            : (dec_is_jal || dec_is_jalr)       ? pc_plus_ilen_nibble
                             : result_nibble;
 
     // Branch condition
-    // TODO: Could make this easier to read.
     wire branch_taken = dec_is_jal || dec_is_jalr || dec_is_ret
                       || (dec_is_branch && (dec_mem_opcode[0] ^ alu_cmp));
 
     // State machine
     always @(posedge clk) begin
         if (!nrst) begin
-            state          <= S_FETCH;
-            pc             <= 24'd0;
-            nibble_counter <= 3'd0;
-            instr_reg      <= 32'd0;
-            alu_carry      <= 1'b0;
-            alu_cmp        <= 1'b1; // EQ starts true
-            rs1_full       <= 32'd0;
+            state           <= S_FETCH;
+            ex2_type        <= EX2_MUL;
+            pc              <= 24'd0;
+            nibble_counter  <= 3'd0;
+            instr_reg       <= 32'd0;
+            alu_carry       <= 1'b0;
+            alu_cmp         <= 1'b1; // EQ starts true
+            rs1_full        <= 32'd0;
             alu_result_full <= 32'd0;
-            rs2_full       <= 32'd0;
-            load_data      <= 32'd0;
-            load_top_bit   <= 1'b0;
-            load_wb_count  <= 3'd0;
-            mem_addr_reg   <= 24'd0;
-            mem_read       <= 1'b0;
-            mem_write      <= 1'b0;
-            mem_wdata      <= 32'd0;
-            mem_size       <= 2'b10;
+            rs2_full        <= 32'd0;
+            load_data       <= 32'd0;
+            load_top_bit    <= 1'b0;
+            load_wb_count   <= 3'd0;
+            mem_addr_reg    <= 24'd0;
+            mem_read        <= 1'b0;
+            mem_write       <= 1'b0;
+            mem_wdata       <= 32'd0;
+            mem_size        <= 2'b10;
         end else begin
             nibble_counter <= nibble_counter + 3'd1;
 
@@ -228,7 +258,7 @@ module tinymoa_core (
                     mem_write <= 1'b0;
                     mem_size <= 2'b10; // word fetch
                     if (mem_ready) begin
-                        // When PC[1]=1, the 16-bit compressed instruction sits in
+                        // When PC[1]=1, the 16b compressed instruction sits in
                         // the upper half of the fetched word — shift it into place.
                         instr_reg <= pc[1] ? {16'd0, mem_rdata[31:16]} : mem_rdata;
                         mem_read  <= 1'b0;
@@ -247,22 +277,25 @@ module tinymoa_core (
                 end
 
                 S_EXECUTE: begin
-                    // Accumulate full values for shifter and memory ops
+                    // Accumulate full register values and ALU result nibble-by-nibble.
+                    // These are used by S_EX2 (shifts/mul/slt) and S_MEM (address/store data).
                     rs1_full[{nibble_counter, 2'b00} +: 4] <= reg_rs1_nibble;
                     rs2_full[{nibble_counter, 2'b00} +: 4] <= reg_rs2_nibble;
-
-                    // Accumulate full ALU result (used as memory address for loads/stores)
                     alu_result_full[{nibble_counter, 2'b00} +: 4] <= alu_result_nibble;
                     alu_carry <= alu_carry_out;
                     alu_cmp   <= alu_cmp_out;
 
                     if (nibble_counter == 3'd7) begin
-                        if (dec_is_load || dec_is_store)
+                        if (dec_is_load || dec_is_store) begin
                             state <= S_MEM;
-                        else if (is_mul)
-                            state <= S_MUL;
-                        else
+                        end else if (is_ex2_needed) begin
+                            state <= S_EX2;
+                            if (is_mul)        ex2_type <= EX2_MUL;
+                            else if (is_shift) ex2_type <= EX2_SHIFT;
+                            else               ex2_type <= EX2_SLT;
+                        end else begin
                             state <= S_WRITEBACK;
+                        end
                     end
                 end
 
@@ -305,16 +338,17 @@ module tinymoa_core (
                         end
                     end
                 end
+
                 S_LOAD_WB: begin
                     load_wb_count <= load_wb_count + 3'd1;
                     if (load_wb_count == 3'd7)
                         state <= S_WRITEBACK;
                 end
 
-                // Second execute pass for C.MUL. Accumulator was reset at the end of
-                // S_EXECUTE (via mul_clr), so this pass starts clean with b_in=rs2_full[15:0]
-                // fully assembled. reg_write_en is active, writing mul_result_nibble each cycle.
-                S_MUL: begin
+                // Second 8 cycle execute pass. rs1_full, rs2_full, and alu_cmp are all
+                // fully assembled from S_EXECUTE. reg_write_en is active; reg_wdata_nibble
+                // selects ex2_nibble which dispatches on ex2_type.
+                S_EX2: begin
                     if (nibble_counter == 3'd7)
                         state <= S_WRITEBACK;
                 end
