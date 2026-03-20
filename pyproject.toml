@@ -8,7 +8,9 @@ dependencies = [
     "cocotb>=2.0.1",
     "cocotb-test>=0.2.6",
     "klayout>=0.30.7",
+    "matplotlib>=3.10.8",
     "numpy>=2.4.2",
+    "pandas>=3.0.1",
     "pytest>=9.0.2",
 ]
 
