@@ -28,12 +28,12 @@ Key design decisions:
 
 | addr[23:22] | Byte Range | Target | Decode |
 |-------------|------------|--------|--------|
-| `00` | `0x000000 – 0x0007FF` | TCM (2 KB, 512x32) | `addr[23:11] == 0` |
-| `00` | `0x000800 – 0x000FFF` | Reserved (future TCM) | — |
-| `00` | `0x001000 – 0x3FFFFF` | QSPI Flash | `addr[23:22]==00 && !is_tcm` |
-| `01` | `0x400000 – 0x400017` | DCIM MMIO (6 regs) | `addr[23:22] == 01` |
-| `10` | `0x800000 – 0xBFFFFF` | QSPI PSRAM A | `addr[23:22] == 10` |
-| `11` | `0xC00000 – 0xFFFFFF` | QSPI PSRAM B | `addr[23:22] == 11` |
+| `00` | `0x000000 - 0x0007FF` | TCM (2 KB, 512x32) | `addr[23:11] == 0` |
+| `00` | `0x000800 - 0x000FFF` | Reserved (future TCM) | — |
+| `00` | `0x001000 - 0x3FFFFF` | QSPI Flash | `addr[23:22]==00 && !is_tcm` |
+| `01` | `0x400000 - 0x400017` | DCIM MMIO (6 regs) | `addr[23:22] == 01` |
+| `10` | `0x800000 - 0xBFFFFF` | QSPI PSRAM A | `addr[23:22] == 10` |
+| `11` | `0xC00000 - 0xFFFFFF` | QSPI PSRAM B | `addr[23:22] == 11` |
 
 Pseudo-hardcoded registers:
 - `tp` = `0x400000` - DCIM MMIO base; all MMIO accesses use `tp`-relative addressing.
