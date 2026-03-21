@@ -70,28 +70,22 @@ module tinymoa_dcim #(
 
     reg [1:0]  status_reg;       // bit 0 = BUSY, bit 1 = DONE
 
-    // -------------------------------------------------------------------------
     // Weight cache and accumulators
     // weight_reg[col][row] = W[row][col]  after LOAD_WEIGHTS
-    // -------------------------------------------------------------------------
     reg [ARRAY_DIM-1:0] weight_reg [0:ARRAY_DIM-1];
     reg [ACC_WIDTH-1:0] shift_acc  [0:ARRAY_DIM-1];
 
     // Current activation bit-plane (1 bit per row)
     reg [ARRAY_DIM-1:0] act_slice;
 
-    // -------------------------------------------------------------------------
     // Signed-conversion bias: bias = cfg_array_size * (2^cfg_precision - 1)
     // Computed once in IDLE when cfg_start fires.
-    // Max value: 32 * 15 = 480 → fits in 9 bits; use 16 for safety.
-    // -------------------------------------------------------------------------
+    // Max value: 32 * 15 = 480 fits in 9 bits; use 16 for safety.
     reg [15:0] bias_reg;
 
-    // -------------------------------------------------------------------------
     // XNOR + compressor wiring (combinational)
     // Two tinymoa_compressor instances per column (covering 16 rows each).
     // popcount[col] = comp_lo + comp_hi  (range 0-32, 6 bits)
-    // -------------------------------------------------------------------------
     wire [4:0] comp_lo_out [0:ARRAY_DIM-1];
     wire [4:0] comp_hi_out [0:ARRAY_DIM-1];
     wire [5:0] popcount    [0:ARRAY_DIM-1];
@@ -174,15 +168,15 @@ module tinymoa_dcim #(
         end
     end
 
-    // -------------------------------------------------------------------------
-    // Signed conversion for STORE_RESULT (combinational, uses row_idx).
+    // Signed conversion for STORE_RESULT
     // store_signed = 2*shift_acc[row_idx] - bias_reg
-    // ACC_WIDTH+2 bits wide: one sign bit + ACC_WIDTH+1 magnitude bits.
-    // -------------------------------------------------------------------------
-    wire signed [ACC_WIDTH+1:0] store_signed =
-        {1'b0, shift_acc[row_idx], 1'b0} - {{(ACC_WIDTH+2-16){1'b0}}, bias_reg};
+    // 17 bits: covers full range (-480 to +960) with sign at [16].
+    // {2'b0, shift_acc, 1'b0} is 14-bit; Verilog promotes to 17 for subtraction.
+    // {1'b0, bias_reg} is 17-bit; no truncation.
+    wire signed [16:0] store_signed =
+        {2'b0, shift_acc[row_idx], 1'b0} - {1'b0, bias_reg};
     wire [31:0] store_word =
-        {{(32-ACC_WIDTH-2){store_signed[ACC_WIDTH+1]}}, store_signed};
+        {{15{store_signed[16]}}, store_signed};
 
     // FSM block
     integer i;
@@ -208,9 +202,6 @@ module tinymoa_dcim #(
             mem_read <= 1'b0;
 
             case (state)
-
-
-                // -------------------------------------------------------------
                 IDLE: begin
                     if (cfg_start) begin
                         status_reg <= 2'b01; // BUSY
@@ -232,16 +223,14 @@ module tinymoa_dcim #(
                 end
 
 
-                // -------------------------------------------------------------
                 // LOAD_WEIGHTS — pipelined: issue next read while latching current.
                 //
                 // Cycle 0 (row_idx=0): assert ren for row 0; no latch yet.
                 // Cycle 1 (row_idx=1): latch row 0 from mem_rdata; assert ren for row 1.
                 // ...
-                // Cycle N (row_idx=N): latch row N-1; no more reads. → FETCH_ACT.
+                // Cycle N (row_idx=N): latch row N-1; no more reads. -> FETCH_ACT.
                 //
                 // Total: cfg_array_size + 1 cycles (vs 2*N without pipelining).
-                // -------------------------------------------------------------
                 LOAD_WEIGHTS: begin
                     // Latch previous row (valid from cycle 1 onward)
                     if (row_idx > 6'd0) begin
@@ -262,12 +251,10 @@ module tinymoa_dcim #(
                 end
 
 
-                // -------------------------------------------------------------
-                // FETCH_ACT — issue one TCM read for the current bit-plane.
+                // FETCH_ACT: issue one TCM read for the current bit-plane.
                 // bit_plane counts MSB-first (cfg_precision-1 down to 0).
                 // Cycle 0: assert ren, set fetch_wait. mem_read cleared at top next cycle.
                 // Cycle 1 (fetch_wait=1): mem_rdata valid; latch act_slice, go to COMPUTE.
-                // -------------------------------------------------------------
                 FETCH_ACT: begin
                     if (!fetch_wait) begin
                         mem_read   <= 1'b1;
@@ -281,12 +268,10 @@ module tinymoa_dcim #(
                 end
 
 
-                // -------------------------------------------------------------
-                // COMPUTE — shift-accumulate one bit-plane across all columns.
+                // COMPUTE: shift-accumulate one bit-plane across all columns.
                 // XNOR outputs are combinational (gen_col block above).
                 // shift_acc[col] = (shift_acc[col] << 1) + popcount[col]
                 // Counts down bit_plane; loops to FETCH_ACT or exits to STORE_RESULT.
-                // -------------------------------------------------------------
                 COMPUTE: begin
                     for (i = 0; i < ARRAY_DIM; i = i + 1)
                         shift_acc[i] <= (shift_acc[i] << 1) + {{(ACC_WIDTH-6){1'b0}}, popcount[i]};
@@ -301,15 +286,13 @@ module tinymoa_dcim #(
                 end
 
 
-                // -------------------------------------------------------------
-                // STORE_RESULT — write signed results to TCM, one column per cycle.
+                // STORE_RESULT: write signed results to TCM, one column per cycle.
                 //
                 // Signed conversion: mem_wdata = 2*shift_acc[col] - bias_reg
                 //   Maps raw unsigned accumulator to true signed dot product.
                 //   The subtraction is done combinationally; result is sign-extended.
                 //
                 // row_idx doubles as the column counter here.
-                // -------------------------------------------------------------
                 STORE_RESULT: begin
                     if (row_idx < cfg_array_size) begin
                         // Signed conversion: 2*shift_acc[col] - bias_reg
