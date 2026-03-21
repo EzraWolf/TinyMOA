@@ -63,10 +63,12 @@ async def setup(dut):
     dut.nrst.value = 1
 
 
-async def run_alu_op(dut, a, b, iterations=150):
+async def run_alu_op(dut, opcode, a, b, c=0, iterations=150):
     """Run ALU operation over many random inputs."""
+    dut.opcode.value = int(opcode)
     dut.a_in.value = int(a)
     dut.b_in.value = int(b)
+    dut.c_in.value = int(c)
     await ClockCycles(dut.clk, 1)
     results = []
     for _ in range(iterations):
@@ -85,11 +87,9 @@ async def run_alu_op(dut, a, b, iterations=150):
 async def test_add_basic(dut):
     """Test ADD operation"""
     await setup(dut)
-    dut.opcode.value = 0b0000
-    dut.c_in.value = 0
     a = random.randint(0, 0xFFFFFFFF)
     b = random.randint(0, 0xFFFFFFFF)
-    for result, a_val, b_val in await run_alu_op(dut, a, b):
+    for result, a_val, b_val in await run_alu_op(dut, 0b0000, a, b):
         expected = (a_val + b_val) & 0xFFFFFFFF
         assert result == expected, (
             f"{a_val} + {b_val}: expected {expected}, got {result}"
@@ -100,12 +100,49 @@ async def test_add_basic(dut):
 async def test_sub_basic(dut):
     """Test SUB operation"""
     await setup(dut)
-    dut.opcode.value = 0b1000
-    dut.c_in.value = 1
     a = random.randint(0, 0xFFFFFFFF)
     b = random.randint(0, 0xFFFFFFFF)
-    for result, a_val, b_val in await run_alu_op(dut, a, b):
+    for result, a_val, b_val in await run_alu_op(dut, 0b1000, a, b, c=1):
         expected = (a_val - b_val) & 0xFFFFFFFF
         assert result == expected, (
             f"{a_val} - {b_val}: expected {expected}, got {result}"
+        )
+
+
+@cocotb.test()
+async def test_and_basic(dut):
+    """Test AND operation"""
+    await setup(dut)
+    a = random.randint(0, 0xFFFFFFFF)
+    b = random.randint(0, 0xFFFFFFFF)
+    for result, a_val, b_val in await run_alu_op(dut, 0b0111, a, b):
+        expected = (a_val & b_val) & 0xFFFFFFFF
+        assert result == expected, (
+            f"{a_val} & {b_val}: expected {expected}, got {result}"
+        )
+
+
+@cocotb.test()
+async def test_or_basic(dut):
+    """Test OR operation"""
+    await setup(dut)
+    a = random.randint(0, 0xFFFFFFFF)
+    b = random.randint(0, 0xFFFFFFFF)
+    for result, a_val, b_val in await run_alu_op(dut, 0b0110, a, b):
+        expected = (a_val | b_val) & 0xFFFFFFFF
+        assert result == expected, (
+            f"{a_val} | {b_val}: expected {expected}, got {result}"
+        )
+
+
+@cocotb.test()
+async def test_xor_basic(dut):
+    """Test XOR operation"""
+    await setup(dut)
+    a = random.randint(0, 0xFFFFFFFF)
+    b = random.randint(0, 0xFFFFFFFF)
+    for result, a_val, b_val in await run_alu_op(dut, 0b0100, a, b):
+        expected = (a_val ^ b_val) & 0xFFFFFFFF
+        assert result == expected, (
+            f"{a_val} ^ {b_val}: expected {expected}, got {result}"
         )
