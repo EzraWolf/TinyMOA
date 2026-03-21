@@ -11,11 +11,11 @@ module tb_bootloader (
 
     input             rom_ready,
     output reg        rom_read,
-    input      [31:0] rom_dout,
+    input      [31:0] rom_rdata,
     output reg [23:0] rom_addr,
 
     output reg        tcm_wen,
-    output reg [31:0] tcm_wdata,
+    output reg [31:0] tcm_din,
     output reg [9:0]  tcm_addr
 );
     `ifdef COCOTB_SIM
@@ -30,13 +30,13 @@ module tb_bootloader (
         .clk       (clk),
         .nrst      (nrst),
         .boot_done (boot_done),
-        .rom_addr  (rom_addr),
-        .rom_read  (rom_read),
-        .rom_dout  (rom_dout),
         .rom_ready (rom_ready),
+        .rom_read  (rom_read),
+        .rom_rdata (rom_rdata),
         .tcm_addr  (tcm_addr),
-        .tcm_wdata (tcm_wdata),
-        .tcm_wen   (tcm_wen)
+        .tcm_wen   (tcm_wen),
+        .tcm_din   (tcm_din),
+        .rom_addr  (rom_addr)
     );
 
     always @(posedge clk) begin

@@ -23,7 +23,6 @@ module tinymoa_top (
     output [7:0] uio_out,
     output [7:0] uio_oe
 );
-    // CPU memory bus
     wire [23:0] cpu_addr;
     wire        cpu_read;
     reg  [31:0] cpu_rdata;
@@ -34,7 +33,6 @@ module tinymoa_top (
 
     // Address decode
     // 0x000000 - 0x0007FF: SRAM (2 KB)
-    
     wire is_tcm     = (cpu_addr[23:11] == 13'd0);
     wire is_flash   = (cpu_addr[23:22] == 2'b00) && !is_tcm;
     wire is_periph  = (cpu_addr[23:22] == 2'b01);
@@ -68,8 +66,7 @@ module tinymoa_top (
     wire        tcm_b_wen  = boot_done ? dcim_b_wen  : boot_b_wen;
     wire        tcm_b_en   = boot_done ? (dcim_b_wen || dcim_b_ren) : boot_b_wen;
 
-    // tcm_ready is asserted the cycle after the request
-    reg tcm_ready;
+    reg tcm_ready; // Asserted the cycle after the req
     always @(posedge clk) begin
         if (!nrst)
             tcm_ready <= 1'b0;
@@ -103,7 +100,7 @@ module tinymoa_top (
     wire [31:0] dcim_rdata;
     wire        dcim_ready;
 
-    // --- CPU memory response mux ---
+    // CPU memory response mux
     always @(*) begin
         if (is_tcm) begin
             cpu_rdata = tcm_a_dout;
@@ -117,9 +114,9 @@ module tinymoa_top (
         end
     end
 
-    // --- Submodule instances ---
+    // === Submodule instances ===
 
-    tinymoa_cpu core (
+    tinymoa_cpu cpu (
         .clk        (clk),
         .nrst       (cpu_nrst),
         .mem_ready  (cpu_ready),
@@ -128,8 +125,7 @@ module tinymoa_top (
         .mem_rdata  (cpu_rdata),
         .mem_write  (cpu_write),
         .mem_wdata  (cpu_wdata),
-        .mem_addr   (cpu_addr),
-
+        .mem_addr   (cpu_addr)
     );
 
     tinymoa_tcm tcm (

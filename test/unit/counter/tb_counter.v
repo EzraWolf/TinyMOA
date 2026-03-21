@@ -22,9 +22,9 @@ module tb_counter (
     end
     `endif
 
-    tinymoa_counter dut_counter (
+    tinymoa_counter #(
         .DATA_WIDTH(32)
-    ) (
+    ) dut_counter (
         .clk    (clk),
         .nrst   (nrst),
         .en     (en),
