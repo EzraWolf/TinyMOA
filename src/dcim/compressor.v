@@ -79,4 +79,5 @@ module tinymoa_compressor (
                        + in[8]  + in[9]  + in[10] + in[11]
                        + in[12] + in[13] + in[14] + in[15];
 `endif
+
 endmodule

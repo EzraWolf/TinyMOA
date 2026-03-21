@@ -31,8 +31,7 @@ module tinymoa_top (
     wire [1:0]  cpu_size;
     reg         cpu_ready;
 
-    // Address decode
-    // 0x000000 - 0x0007FF: SRAM (2 KB)
+    // Address decode: 0x000000 - 0x0007FF (SRAM 512x32, 2KB)
     wire is_tcm     = (cpu_addr[23:11] == 13'd0);
     wire is_flash   = (cpu_addr[23:22] == 2'b00) && !is_tcm;
     wire is_periph  = (cpu_addr[23:22] == 2'b01);

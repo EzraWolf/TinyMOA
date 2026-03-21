@@ -14,7 +14,7 @@ module tinymoa_decoder (
 
     output reg  [31:0] imm,
     output reg  [3:0]  alu_opcode,
-    output reg  [2:0]  mem_opcode,   // [1:0]=size, [2]=unsigned
+    output reg  [2:0]  mem_opcode, // [1:0]=size, [2]=unsigned
     output reg  [3:0]  rs1,
     output reg  [3:0]  rs2,
     output reg  [3:0]  rd,
@@ -43,10 +43,12 @@ module tinymoa_decoder (
     // 16-bit compressed fields
     wire [1:0] c_quad   = instr[1:0];
     wire [2:0] c_f3     = instr[15:13];
+
     // Compressed register fields (prime registers: x8-x15)
     wire [3:0] c_rd_p   = {1'b1, instr[4:2]};
     wire [3:0] c_rs1_p  = {1'b1, instr[9:7]};
     wire [3:0] c_rs2_p  = {1'b1, instr[4:2]};
+
     // Full register fields for non-prime compressed
     wire [3:0] c_rd_f   = {1'b0, instr[11:9]};
     wire [3:0] c_rs1_f  = {1'b0, instr[11:9]};
@@ -85,7 +87,7 @@ module tinymoa_decoder (
                 5'b00100: begin // OP-IMM
                     is_alu_imm = 1'b1;
                     imm        = {{20{instr[31]}}, instr[31:20]};
-                    // alu_opcode from funct3/funct7 -- fully decoded here
+                    // alu_opcode from funct3/funct7 fully decoded here
                 end
                 5'b00101: begin // AUIPC
                     is_auipc   = 1'b1;
@@ -122,7 +124,7 @@ module tinymoa_decoder (
                 5'b11100: begin // SYSTEM (Zicsr stub: reads return 0, writes ignored)
                     is_system = 1'b1;
                 end
-                5'b00011: begin // FENCE -- NOP in this implementation
+                5'b00011: begin // FENCE/NOP in this implementation
                 end
                 default: begin end
             endcase

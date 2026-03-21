@@ -141,6 +141,7 @@ module tinymoa_cpu (
     );
 
     // === Core FSM ===
+
     always @(posedge clk or negedge nrst) begin
         if (!nrst) begin
             state      <= S_FETCH;
