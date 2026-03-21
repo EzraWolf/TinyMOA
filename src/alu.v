@@ -69,7 +69,7 @@ module tinymoa_alu (
 endmodule
 
 
-// Shifter -- barrel shift on full 32-bit value, output nibble-by-nibble.
+// Shifter: barrel shift on full 32-bit value, output nibble-by-nibble.
 // Core collects full rs1 then reads result_nibble for nibble_ct 0..7.
 // opcode: 0001=SLL, 0101=SRL, 1101=SRA.
 module tinymoa_shifter (
@@ -95,7 +95,7 @@ module tinymoa_shifter (
 endmodule
 
 
-// Multiplier -- 16x16 signed -> 32-bit result
+// Multiplier: 16x16 signed -> 32-bit result
 // Core feeds rs1[15:0] and rs2[15:0], then reads product nibble-by-nibble via nibble_ct.
 module tinymoa_multiplier (
     input  signed [15:0] a_in,
