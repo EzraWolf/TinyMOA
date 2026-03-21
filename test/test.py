@@ -83,7 +83,7 @@ def test_qspi_controller():
     run_test("qspi_controller", "qspi_controller")
 
 
-# Register Unit Tests
+# Register unit tests
 def test_registers():
     run_test("registers", "registers")
 
