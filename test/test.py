@@ -73,6 +73,11 @@ def test_shifter():
     run_test("shifter", "shifter", dir="alu")
 
 
+# Bootloader unit tests
+def test_bootloader():
+    run_test("bootloader", "bootloader")
+
+
 # QSPI flash/PSRAM unit tests
 def test_qspi_controller():
     run_test("qspi_controller", "qspi_controller", dir="memory")
