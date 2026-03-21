@@ -78,26 +78,19 @@ def test_bootloader():
     run_test("bootloader", "bootloader")
 
 
-# QSPI flash/PSRAM unit tests
+# QSPI unit tests
 def test_qspi_controller():
-    run_test("qspi_controller", "qspi_controller", dir="memory")
-
-
-def test_qspi_flash():
-    run_test("qspi_controller", "qspi_flash", dir="memory")
-
-
-def test_qspi_psram():
-    run_test("qspi_controller", "qspi_psram", dir="memory")
-
-
-def test_sram_functional():
-    run_test("sram", "sram_functional", dir="memory")
+    run_test("qspi_controller", "qspi_controller")
 
 
 # Register Unit Tests
 def test_registers():
     run_test("registers", "registers")
+
+
+# TCM unit tests
+def test_tcm():
+    run_test("tcm", "tcm")
 
 
 def test_counter():
