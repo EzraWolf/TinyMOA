@@ -1,4 +1,4 @@
-// CPU core test bench
+// CPU core unit test bench
 
 `default_nettype none
 `timescale 1ns / 1ps
