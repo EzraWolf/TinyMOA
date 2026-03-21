@@ -51,21 +51,61 @@ from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
 
-async def setup_tb_alu(dut):
-    """Initialize the ALU"""
+async def setup(dut):
     clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
-
-    # Reset the DUT
     dut.nrst.value = 0
+    dut.opcode.value = 0
+    dut.a_in.value = 0
+    dut.b_in.value = 0
+    dut.c_in.value = 0
     await ClockCycles(dut.clk, 1)
     dut.nrst.value = 1
 
 
-@cocotb.test()
-async def test_foo(dut):
-    """Test template"""
-    await setup_tb_alu(dut)
+async def run_alu_op(dut, a, b, iterations=150):
+    """Run ALU operation over many random inputs."""
+    dut.a_in.value = int(a)
+    dut.b_in.value = int(b)
     await ClockCycles(dut.clk, 1)
+    results = []
+    for _ in range(iterations):
+        await ClockCycles(dut.clk, 7)
+        next_a = random.randint(0, 0xFFFFFFFF)
+        next_b = random.randint(0, 0xFFFFFFFF)
+        dut.a_in.value = int(next_a)
+        dut.b_in.value = int(next_b)
+        await ClockCycles(dut.clk, 1)
+        results.append((int(dut.result.value), a, b))
+        a, b = next_a, next_b
+    return results
 
-    raise NotImplementedError("Test not implemented yet")
+
+@cocotb.test()
+async def test_add_basic(dut):
+    """Test ADD operation"""
+    await setup(dut)
+    dut.opcode.value = 0b0000
+    dut.c_in.value = 0
+    a = random.randint(0, 0xFFFFFFFF)
+    b = random.randint(0, 0xFFFFFFFF)
+    for result, a_val, b_val in await run_alu_op(dut, a, b):
+        expected = (a_val + b_val) & 0xFFFFFFFF
+        assert result == expected, (
+            f"{a_val} + {b_val}: expected {expected}, got {result}"
+        )
+
+
+@cocotb.test()
+async def test_sub_basic(dut):
+    """Test SUB operation"""
+    await setup(dut)
+    dut.opcode.value = 0b1000
+    dut.c_in.value = 1
+    a = random.randint(0, 0xFFFFFFFF)
+    b = random.randint(0, 0xFFFFFFFF)
+    for result, a_val, b_val in await run_alu_op(dut, a, b):
+        expected = (a_val - b_val) & 0xFFFFFFFF
+        assert result == expected, (
+            f"{a_val} - {b_val}: expected {expected}, got {result}"
+        )
