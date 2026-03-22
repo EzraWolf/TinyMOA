@@ -4,7 +4,7 @@
 > Covers the programmer model: registers, instruction encodings, and opcode tables. For RTL implementation details see Architecture.md.
 
 ## Extension Summary
-Canonical status table: RV32I (full), E (x0–x15 only), C/Zca (full Q0/Q1/Q2), Zcb (full — C.MUL uses custom ALU opcode `4'b1010` instead of standard Zcb encoding), Zicond. No Zicsr. No M. No F. No TinyQV custom extensions.
+Canonical status table: RV32I (full), E (x0–x15 only), C/Zca (full Q0/Q1/Q2), Zcb (full w/ C.MUL at standard CA-type Q1 funct6=100111 encoding), Zicond. No Zicsr. No M. No F. No TinyQV custom extensions.
 
 | Extension            | Status                  | Notes                                 |
 |----------------------|-------------------------|---------------------------------------|
@@ -16,8 +16,6 @@ Canonical status table: RV32I (full), E (x0–x15 only), C/Zca (full Q0/Q1/Q2), 
 | M (multiply/divide)  | Not implemented         | Opcodes reserved                      |
 | F (floating-point)   | Not implemented         | Opcodes reserved                      |
 | CIM custom           | Considered, not planned | CIM via MMIO only                     |
-
-\* **Note on `c.mul`**: The decoder implements the multiply instruction at quadrant 2, funct3=101 (`5'b10101`) with `alu_opcode=4'b1010`. This encoding does **not** match the standard Zcb `c.mul` (CA-type, Q1, funct6=100111). The current implementation is effectively a non-standard compressed multiply. Whether to fix the encoding to match the Zcb spec is an open question.
 
 
 ## Registers
@@ -113,7 +111,7 @@ opcode[6:2] to instruction group. Standard RV32I only — no M/F/custom opcode g
 | `1110` | CZERO.EQZ | Conditional zero if rs2 == 0 |
 | `1111` | CZERO.NEZ | Conditional zero if rs2 != 0 |
 
-\* This C.MUL is not a standard Zcb extension opcode, additionally, it is only 16-bit X 16-bit, to produce a 32-bit product.
+\* C.MUL uses the standard Zcb CA-type encoding (Q1, funct6=100111, funct2=10), but the operation is 16x16 signed multiply producing a 32-bit result.
 
 ### Internal Memory Opcodes
 3-bit dec_mem_opcode: size (byte/half/word) and unsigned flag.
@@ -140,9 +138,6 @@ TinyMOA implements `RV32EC` with extensions `Zcb`, `Zicsr`, `Zicond`. No custom 
 | M (multiply/divide) | Not implemented | Opcodes reserved |
 | F (floating-point) | Not implemented | Opcodes reserved |
 | CIM custom | Not planned | CIM via MMIO only |
-
-\* **Note on `c.mul`**: The decoder implements the multiply instruction at quadrant 2, funct3=101 (`5'b10101`) with `alu_opcode=4'b1010`. This encoding does **not** match the standard Zcb `c.mul` (CA-type, Q1, funct6=100111). The current implementation is effectively a non-standard compressed multiply. Whether to fix the encoding to match the Zcb spec is an open question.
-
 
 ## Registers
 
@@ -257,8 +252,9 @@ For branches, `mem_opcode[0]` = polarity invert (BNE/BGE/BGEU vs BEQ/BLT/BLTU).
 | funct3=100, instr[11:10]=00 | C.SRLI | rd' >>= uimm (logical) |
 | funct3=100, instr[11:10]=01 | C.SRAI | rd' >>= uimm (arithmetic) |
 | funct3=100, instr[11:10]=10 | C.ANDI | rd' &= imm |
+| funct3=100, instr[12]=1, instr[11:10]=11, instr[6:5]=10 | C.MUL | rd' = rd'[15:0] * rs2'[15:0] (Zcb, funct6=100111) |
 | funct3=100, instr[12]=1 | C.NOT / C.ZEXT.* | Bitwise NOT or zero-extend |
-| funct3=100, instr[12]=0 | C.SUB/XOR/OR/AND | Register arithmetic |
+| funct3=100, instr[12]=0, instr[11:10]=11 | C.SUB/XOR/OR/AND | Register arithmetic |
 | funct3=101 | C.J | PC += offset |
 | funct3=110 | C.BEQZ | if (rs1' == 0) PC += offset |
 | funct3=111 | C.BNEZ | if (rs1' != 0) PC += offset |
@@ -273,6 +269,5 @@ For branches, `mem_opcode[0]` = polarity invert (BNE/BGE/BGEU vs BEQ/BLT/BLTU).
 | funct3=100, instr[12]=1, rs1≠0, rs2≠0 | C.ADD | rd += rs2 |
 | funct3=100, instr[12]=1, rs1≠0, rs2=0 | C.JALR | ra = PC+2; PC = rs1 |
 | funct3=100, instr[12]=1, rs1=0, rs2=0 | C.EBREAK | Halt |
-| funct3=101 | C.MUL | rd' *= rs2'[15:0] (non-standard encoding, see note) |
 | funct3=110 | C.SWSP | mem[sp + offset] = rs2 |
 | funct3=111 | C.SWTP | mem[tp + offset] = rs2 |

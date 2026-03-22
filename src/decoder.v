@@ -4,7 +4,7 @@
 // 16-bit compressed instructions arrive zero-extended to 32 bits.
 //
 // Compressed register fields (3-bit) map to x8-x15: rd = {1'b1, instr[N:M]}.
-// C.MUL: Q2 funct3=101, ALU opcode 4'b1010 (non-standard Zcb encoding).
+// C.MUL: Q1 CA-type (instr[15:13]=100, instr[12:10]=111, instr[6:5]=10), ALU opcode 4'b1010.
 
 `default_nettype none
 `timescale 1ns / 1ps
@@ -247,14 +247,18 @@ module tinymoa_decoder (
                                     is_alu_imm = 1'b1;
                                     alu_opcode = 4'b0111; // AND
                                 end
-                                2'b11: begin // C.SUB/XOR/OR/AND (CA)
+                                2'b11: begin // C.SUB/XOR/OR/AND (CA) or C.MUL (Zcb, instr[12]=1, funct2=10)
                                     is_alu_reg = 1'b1;
-                                    case (instr[6:5])
-                                        2'b00: alu_opcode = 4'b1000; // SUB
-                                        2'b01: alu_opcode = 4'b0100; // XOR
-                                        2'b10: alu_opcode = 4'b0110; // OR
-                                        2'b11: alu_opcode = 4'b0111; // AND
-                                    endcase
+                                    if (instr[12] && instr[6:5] == 2'b10) begin
+                                        alu_opcode = 4'b1010; // C.MUL
+                                    end else begin
+                                        case (instr[6:5])
+                                            2'b00: alu_opcode = 4'b1000; // SUB
+                                            2'b01: alu_opcode = 4'b0100; // XOR
+                                            2'b10: alu_opcode = 4'b0110; // OR
+                                            2'b11: alu_opcode = 4'b0111; // AND
+                                        endcase
+                                    end
                                 end
                             endcase
                         end
@@ -318,12 +322,8 @@ module tinymoa_decoder (
                                 end
                             end
                         end
-                        3'b101: begin // C.MUL (non-standard: Q2 f3=101, opcode=4'b1010)
-                            rd         = c_rd_p;
-                            rs1        = c_rd_p;
-                            rs2        = c_rs2_p;
-                            alu_opcode = 4'b1010;
-                        end
+                        
+                        // 3'b101: begin end // reserved
                         3'b110: begin // C.SWSP
                             is_store   = 1'b1;
                             rs1        = 4'd2; // sp

@@ -3,17 +3,7 @@
 // Three datapaths, selected by core FSM based on decoded opcode:
 //   1. Nibble-serial ALU — carry-chained ADD/SUB/AND/OR/XOR/SLT/SLTU/CZERO
 //   2. Shifter           — SLL/SRL/SRA (needs full operand + shift amount)
-//   3. Multiplier        — C.MUL: 16x16 signed → 32-bit (combinational)
-//
-// C.MUL uses non-standard Zcb encoding (Q2 funct3=101, ALU opcode 4'b1010).
-// This is NOT the standard Zcb c.mul (CA-type, Q1, funct6=100111).
-//
-// ALU Opcode Table (from decoder):
-//   0000  ADD             0100  XOR             1000  SUB
-//   0001  SLL             0101  SRL             1010  MUL (C.MUL)
-//   0010  SLT (signed)    0110  OR              1101  SRA
-//   0011  SLTU (unsigned) 0111  AND             1110  CZERO.EQZ
-//                                               1111  CZERO.NEZ
+//   3. Multiplier        — C.MUL: 16x16 signed -> 32-bit
 //
 // Comparison outputs (cmp_out) used for branches:
 //   opcode[0]=1: unsigned compare (SLTU/BGEU/BLTU)
