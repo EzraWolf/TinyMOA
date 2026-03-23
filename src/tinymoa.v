@@ -19,7 +19,8 @@ module tinymoa_top (
     input  wire        ena,
     input  wire [7:0]  ui_in,
     output wire [7:0]  uo_out,
-    inout  wire [7:0]  uio_io,
+    input  wire [7:0]  uio_in,
+    output wire [7:0]  uio_out,
     output wire [7:0]  uio_oe
 );
 
@@ -35,7 +36,7 @@ module tinymoa_top (
     wire par_is_tcm  = is_parallel & ~par_space;
     wire par_is_mmio = is_parallel &  par_space;
 
-    wire [3:0] par_data_in = uio_io[7:4];
+    wire [3:0] par_data_in = uio_in[7:4];
 
     // === CPU clock gate ===
     wire cpu_clk = clk & ~dbg_en;
@@ -315,8 +316,7 @@ module tinymoa_top (
         dbg_strobe
     };
 
-    assign uio_io[7:4] = (is_parallel & par_oe) ? par_read_nibble : 4'bz;
-    assign uio_io[3:0] = 4'bz;
+    assign uio_out = is_parallel ? {par_read_nibble, 4'b0} : 8'b0;
     assign uio_oe      = is_parallel ? {{4{par_oe}}, 4'b0}  : 8'b0;
 
     wire _unused = &{cpu_mem_size, ena, 1'b0};
