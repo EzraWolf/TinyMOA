@@ -506,6 +506,17 @@ def encode_c_mul(rd, rs2):
     return encode_ca_type(0b100111, rd & 0x7, 0b10, rs2 & 0x7, 0b01)
 
 
+def encode_c_not(rd):
+    """
+    Compressed Bitwise NOT (Zcb CA-Type, Q1 funct6=100111 funct2=00)
+    C.NOT rd'   rd' = rd' XOR -1  (xori rd', rd', -1)
+
+    Shares funct6 with C.MUL, differentiated by funct2=00 vs 10.
+    rs2' field unused (single-register operation).
+    """
+    return encode_ca_type(0b100111, rd & 0x7, 0b00, 0, 0b01)
+
+
 def encode_c_zext_b(rd):
     """
     Zero extend byte (Zcb CA-Type, Q1 funct6=100000 funct2=00)
