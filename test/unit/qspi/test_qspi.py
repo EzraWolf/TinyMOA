@@ -54,7 +54,9 @@ async def start_write(dut, addr, wdata, size=2):
     dut.size.value = size
     dut.wdata.value = wdata
     dut.write.value = 1
-    await RisingEdge(dut.clk)  # IDLE posedge: latches addr/wdata, asserts CS, state->CMD
+    await RisingEdge(
+        dut.clk
+    )  # IDLE posedge: latches addr/wdata, asserts CS, state->CMD
     dut.write.value = 0
 
 
