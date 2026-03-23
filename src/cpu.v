@@ -31,7 +31,14 @@ module tinymoa_cpu (
     output        dbg_done,
     output [23:0] dbg_pc,
     output [31:0] dbg_instr,
-    output [31:0] dbg_alu_result
+    output [31:0] dbg_alu_result,
+    output [3:0]  dbg_dec_alu_opcode,
+    output [2:0]  dbg_dec_mem_opcode,
+    output [3:0]  dbg_dec_rs1,
+    output [3:0]  dbg_dec_rs2,
+    output [3:0]  dbg_dec_rd,
+    output [10:0] dbg_dec_flags,
+    output        dbg_branch_taken
 );
 
     // === FSM states ===
@@ -155,6 +162,17 @@ module tinymoa_cpu (
     wire branch_is_eq  = (decoder_alu_opcode == 4'b0001);
     wire branch_cond   = branch_is_eq ? (cpu_execute == 32'b0) : cpu_execute[0];
     wire branch_taken  = decoder_is_branch && (branch_cond ^ cpu_instr[12]);
+
+    assign dbg_dec_alu_opcode = decoder_alu_opcode;
+    assign dbg_dec_mem_opcode = decoder_mem_opcode;
+    assign dbg_dec_rs1        = decoder_rs1;
+    assign dbg_dec_rs2        = decoder_rs2;
+    assign dbg_dec_rd         = decoder_rd;
+    assign dbg_dec_flags      = {decoder_is_load, decoder_is_store, decoder_is_branch,
+                                  decoder_is_jal, decoder_is_jalr, decoder_is_lui,
+                                  decoder_is_auipc, decoder_is_alu_reg, decoder_is_alu_imm,
+                                  decoder_is_system, decoder_is_compressed};
+    assign dbg_branch_taken   = branch_taken;
 
     // === Write-back data mux (combinational) ===
     wire writes_rd = decoder_is_alu_reg || decoder_is_alu_imm

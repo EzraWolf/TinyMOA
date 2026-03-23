@@ -62,7 +62,10 @@ module tinymoa_dcim #(
     output reg [31:0] mem_wdata,
     output reg        mem_write,
     output reg        mem_read,
-    output reg [9:0]  mem_addr
+    output reg [9:0]  mem_addr,
+
+    // Debug
+    output [2:0] dbg_state
 );
 
     // MMIO config registers are wrote by the CPU before asserting cfg_start
@@ -114,14 +117,23 @@ module tinymoa_dcim #(
         end
     endgenerate
 
+    // === FSM state encoding ===
+    localparam IDLE         = 3'd0;
+    localparam LOAD_WEIGHTS = 3'd1;
+    localparam FETCH_ACT    = 3'd2;
+    localparam COMPUTE      = 3'd3;
+    localparam STORE_RESULT = 3'd4;
+    localparam DONE         = 3'd5;
+
     reg [2:0] state;
+
+    assign dbg_state = state;
+
     reg [5:0] row_idx;    // dual-use as row counter in LOAD_WEIGHTS and STORE_RESULT
     reg [2:0] bit_plane;  // current bit-plane index (counts down from cfg_precision-1 to 0)
     reg       fetch_wait; // 1-cycle wait flag for FETCH_ACT (data valid on second cycle)
 
-    // ==========================================================================
     // === MMIO block. Runs independently of FSM, always live for CPU polling ===
-    // ==========================================================================
     always @(posedge clk or negedge nrst) begin
         if (!nrst) begin
             cfg_start          <= 1'b0;
@@ -177,13 +189,6 @@ module tinymoa_dcim #(
         {{15{store_signed[16]}}, store_signed};
 
     // === FSM block ===
-    localparam IDLE         = 3'd0;
-    localparam LOAD_WEIGHTS = 3'd1;
-    localparam FETCH_ACT    = 3'd2;
-    localparam COMPUTE      = 3'd3;
-    localparam STORE_RESULT = 3'd4;
-    localparam DONE         = 3'd5;
-
     integer i;
     always @(posedge clk or negedge nrst) begin
         if (!nrst) begin

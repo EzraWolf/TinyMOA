@@ -105,10 +105,17 @@ module tb_cpu (
         .mem_size  (cpu_mem_size),
         .mem_rdata (cpu_mem_rdata),
         .mem_ready (cpu_mem_ready),
-        .dbg_state      (dbg_state),
-        .dbg_done       (dbg_done),
-        .dbg_pc         (dbg_pc),
-        .dbg_instr      (dbg_instr),
-        .dbg_alu_result (dbg_alu_result)
+        .dbg_state          (dbg_state),
+        .dbg_done           (dbg_done),
+        .dbg_pc             (dbg_pc),
+        .dbg_instr          (dbg_instr),
+        .dbg_alu_result     (dbg_alu_result),
+        .dbg_dec_alu_opcode (),
+        .dbg_dec_mem_opcode (),
+        .dbg_dec_rs1        (),
+        .dbg_dec_rs2        (),
+        .dbg_dec_rd         (),
+        .dbg_dec_flags      (),
+        .dbg_branch_taken   ()
     );
 endmodule
