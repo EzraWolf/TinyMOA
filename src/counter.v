@@ -12,7 +12,7 @@ module tinymoa_counter #(
 
     input en,
     input wen,
-    input [DATA_WIDTH-1:0]  data_in,
+    input  [DATA_WIDTH-1:0] data_in,
 
     output [DATA_WIDTH-1:0] result,
     output c_out
