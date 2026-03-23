@@ -149,12 +149,12 @@ module tinymoa_cpu (
     end
 
     // === Branch condition (combinational on cpu_execute) ===
-    // BEQ/BNE: ALU does XOR, branch if result == 0 (equal)
-    // BLT/BGE: ALU does SLT, branch if result[0] == 1 (less-than)
-    // funct3[0] inverts: BNE, BGE, BGEU
-    wire branch_cond = (cpu_instr[14:13] == 2'b00) ? (cpu_execute == 32'b0)
-                                                    : cpu_execute[0];
-    wire branch_taken = decoder_is_branch && (branch_cond ^ cpu_instr[12]);
+    // Equality branches (BEQ/BNE/C.BEQZ/C.BNEZ): ALU does SUB (opcode 0001), taken when result==0
+    // Comparison branches (BLT/BGE/BLTU/BGEU):    ALU does SLT/SLTU,          taken when result[0]==1
+    // Inversion (BNE, BGE, BGEU, C.BNEZ): cpu_instr[12]==1 for both 32-bit funct3[0] and C encoding
+    wire branch_is_eq  = (decoder_alu_opcode == 4'b0001);
+    wire branch_cond   = branch_is_eq ? (cpu_execute == 32'b0) : cpu_execute[0];
+    wire branch_taken  = decoder_is_branch && (branch_cond ^ cpu_instr[12]);
 
     // === Write-back data mux (combinational) ===
     wire writes_rd = decoder_is_alu_reg || decoder_is_alu_imm
@@ -244,7 +244,7 @@ module tinymoa_cpu (
                     regfile_rd_data <= wb_data;
 
                     if (branch_taken || decoder_is_jal)
-                        cpu_pc <= cpu_pc + decoder_imm[23:0];
+                        cpu_pc <= cpu_pc + {{2{decoder_imm[23]}}, decoder_imm[23:2]};
                     else if (decoder_is_jalr)
                         cpu_pc <= cpu_execute[23:0];
                     else
