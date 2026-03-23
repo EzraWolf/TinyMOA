@@ -27,10 +27,7 @@ module tb_cpu (
 
     localparam LATENCY = 12;
 
-    // --- Storage ---
-    reg [31:0] mem [0:2047];
-
-    // --- CPU bus signals ---
+    reg  [31:0] mem [0:2047];
     wire [23:0] cpu_mem_addr;
     wire        cpu_mem_read;
     wire        cpu_mem_write;
@@ -39,8 +36,7 @@ module tb_cpu (
     reg  [31:0] cpu_mem_rdata;
     reg         cpu_mem_ready;
 
-    // --- QSPI delay counter ---
-    reg [3:0] delay_ct;
+    reg [3:0]  qspi_delay;
     reg        qspi_ready;
     reg [31:0] qspi_rdata;
 
@@ -71,7 +67,7 @@ module tb_cpu (
     // --- Clocked: TCM writes + QSPI delay ---
     always @(posedge clk or negedge nrst) begin
         if (!nrst) begin
-            delay_ct   <= 4'd0;
+            qspi_delay <= 4'd0;
             qspi_ready <= 1'b0;
             qspi_rdata <= 32'b0;
         end else begin
@@ -84,18 +80,18 @@ module tb_cpu (
 
             // QSPI delay logic
             if (bus_active && !tcm_hit) begin
-                if (delay_ct == LATENCY - 1) begin
+                if (qspi_delay == LATENCY - 1) begin
                     qspi_ready <= 1'b1;
-                    delay_ct   <= 4'd0;
+                    qspi_delay   <= 4'd0;
                     if (cpu_mem_read)
                         qspi_rdata <= mem[cpu_mem_addr];
                     if (cpu_mem_write)
                         mem[cpu_mem_addr] <= cpu_mem_wdata;
                 end else begin
-                    delay_ct <= delay_ct + 4'd1;
+                    qspi_delay <= qspi_delay + 4'd1;
                 end
             end else begin
-                delay_ct <= 4'd0;
+                qspi_delay <= 4'd0;
             end
         end
     end
