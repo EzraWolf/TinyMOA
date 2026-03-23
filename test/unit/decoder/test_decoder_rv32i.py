@@ -248,46 +248,53 @@ async def test_sub(dut):
     verify_r_type(dut, alu_opcode=0b0001, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_sll(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32i.encode_sll(rd=1, rs1=2, rs2=3))
+    verify_r_type(dut, alu_opcode=0b1000, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_slt(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32i.encode_slt(rd=1, rs1=2, rs2=3))
+    verify_r_type(dut, alu_opcode=0b0010, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_sltu(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32i.encode_sltu(rd=1, rs1=2, rs2=3))
+    verify_r_type(dut, alu_opcode=0b0011, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_xor(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32i.encode_xor(rd=1, rs1=2, rs2=3))
+    verify_r_type(dut, alu_opcode=0b0100, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_srl(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32i.encode_srl(rd=1, rs1=2, rs2=3))
+    verify_r_type(dut, alu_opcode=0b1001, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_sra(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32i.encode_sra(rd=1, rs1=2, rs2=3))
+    verify_r_type(dut, alu_opcode=0b1010, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_or(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32i.encode_or(rd=1, rs1=2, rs2=3))
+    verify_r_type(dut, alu_opcode=0b0101, rd=1, rs1=2, rs2=3)
 
 
 @cocotb.test()
@@ -297,16 +304,24 @@ async def test_and(dut):
     verify_r_type(dut, alu_opcode=0b0110, rd=8, rs1=9, rs2=10)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_czero_eqz(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(
+        dut,
+        rv32i.encode_r_type(funct7=0x07, rs2=3, rs1=2, funct3=0x5, rd=1, opcode=0x33),
+    )
+    verify_r_type(dut, alu_opcode=0b1110, rd=1, rs1=2, rs2=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_czero_nez(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(
+        dut,
+        rv32i.encode_r_type(funct7=0x07, rs2=3, rs1=2, funct3=0x6, rd=1, opcode=0x33),
+    )
+    verify_r_type(dut, alu_opcode=0b1111, rd=1, rs1=2, rs2=3)
 
 
 # === I-Type ===
