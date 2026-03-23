@@ -34,8 +34,8 @@ SIZE_ADDR = 0x14  # cfg_array_size  [5:0]
 DEFAULT_WEIGHT_BASE = 0x1A0  # 416
 DEFAULT_ACT_BASE = 0x1C0  # 448
 DEFAULT_RESULT_BASE = 0x1E0  # 480
-DEFAULT_ARRAY_SIZE = 32
-ARRAY_DIM = 32
+DEFAULT_ARRAY_SIZE = 16
+ARRAY_DIM = 16
 
 
 async def setup(dut):
@@ -223,7 +223,7 @@ async def status_done_after_inference(dut):
 
 @cocotb.test()
 async def weight_loading_count(dut):
-    """Exactly 32 words are written back to result_base after all-zero inference."""
+    """Exactly 16 words are written back to result_base after all-zero inference."""
     await setup(dut)
     mem = {DEFAULT_WEIGHT_BASE + i: 0 for i in range(ARRAY_DIM)}
     mem[DEFAULT_ACT_BASE] = 0
@@ -268,14 +268,14 @@ async def skip_reload_finishes_faster(dut):
 @cocotb.test()
 async def end_to_end_all_ones_1bit(dut):
     """
-    All-ones weights, all-ones activation, 1-bit precision, array_size=32.
-    popcount = 32 per column. shift_acc = 32.
-    bias = 32 * (2^1 - 1) = 32.
-    signed = 2*32 - 32 = 32. All 32 results must equal 32.
+    All-ones weights, all-ones activation, 1-bit precision, array_size=16.
+    popcount = 16 per column. shift_acc = 16.
+    bias = 16 * (2^1 - 1) = 16.
+    signed = 2*16 - 16 = 16. All 16 results must equal 16.
     """
     await setup(dut)
-    mem = {DEFAULT_WEIGHT_BASE + i: 0xFFFFFFFF for i in range(ARRAY_DIM)}
-    mem[DEFAULT_ACT_BASE + 0] = 0xFFFFFFFF
+    mem = {DEFAULT_WEIGHT_BASE + i: 0xFFFF for i in range(ARRAY_DIM)}
+    mem[DEFAULT_ACT_BASE + 0] = 0xFFFF
     mem.update({DEFAULT_RESULT_BASE + i: 0 for i in range(ARRAY_DIM)})
     await mem_preload(dut, mem)
 
@@ -288,7 +288,7 @@ async def end_to_end_all_ones_1bit(dut):
         got = await mem_read_tb(dut, addr)
         if got >= 0x80000000:
             got -= 0x100000000
-        assert got == 32, f"col {col}: expected 32, got {got}"
+        assert got == 16, f"col {col}: expected 16, got {got}"
 
 
 @cocotb.test()
@@ -296,11 +296,11 @@ async def end_to_end_all_zeros_1bit(dut):
     """
     All-zeros weights, all-ones activation, 1-bit precision.
     XNOR(0,1)=0, popcount=0, shift_acc=0.
-    bias = 32. signed = 2*0 - 32 = -32. All results must equal -32.
+    bias = 16. signed = 2*0 - 16 = -16. All results must equal -16.
     """
     await setup(dut)
     mem = {DEFAULT_WEIGHT_BASE + i: 0x00000000 for i in range(ARRAY_DIM)}
-    mem[DEFAULT_ACT_BASE + 0] = 0xFFFFFFFF
+    mem[DEFAULT_ACT_BASE + 0] = 0xFFFF
     mem.update({DEFAULT_RESULT_BASE + i: 0 for i in range(ARRAY_DIM)})
     await mem_preload(dut, mem)
 
@@ -313,21 +313,21 @@ async def end_to_end_all_zeros_1bit(dut):
         got = await mem_read_tb(dut, addr)
         if got >= 0x80000000:
             got -= 0x100000000
-        assert got == -32, f"col {col}: expected -32, got {got}"
+        assert got == -16, f"col {col}: expected -16, got {got}"
 
 
 @cocotb.test()
 async def end_to_end_all_ones_2bit(dut):
     """
     All-ones weights, all-ones activation (both bit-planes), 2-bit precision.
-    bit_plane=1: shift_acc = 0*2 + 32 = 32
-    bit_plane=0: shift_acc = 32*2 + 32 = 96
-    bias = 32 * (2^2 - 1) = 96. signed = 2*96 - 96 = 96.
+    bit_plane=1: shift_acc = 0*2 + 16 = 16
+    bit_plane=0: shift_acc = 16*2 + 16 = 48
+    bias = 16 * (2^2 - 1) = 48. signed = 2*48 - 48 = 48.
     """
     await setup(dut)
-    mem = {DEFAULT_WEIGHT_BASE + i: 0xFFFFFFFF for i in range(ARRAY_DIM)}
-    mem[DEFAULT_ACT_BASE + 0] = 0xFFFFFFFF  # LSB bit-plane
-    mem[DEFAULT_ACT_BASE + 1] = 0xFFFFFFFF  # MSB bit-plane
+    mem = {DEFAULT_WEIGHT_BASE + i: 0xFFFF for i in range(ARRAY_DIM)}
+    mem[DEFAULT_ACT_BASE + 0] = 0xFFFF  # LSB bit-plane
+    mem[DEFAULT_ACT_BASE + 1] = 0xFFFF  # MSB bit-plane
     mem.update({DEFAULT_RESULT_BASE + i: 0 for i in range(ARRAY_DIM)})
     await mem_preload(dut, mem)
 
@@ -340,4 +340,4 @@ async def end_to_end_all_ones_2bit(dut):
         got = await mem_read_tb(dut, addr)
         if got >= 0x80000000:
             got -= 0x100000000
-        assert got == 96, f"col {col}: expected 96, got {got}"
+        assert got == 48, f"col {col}: expected 48, got {got}"
