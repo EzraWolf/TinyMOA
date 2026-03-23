@@ -121,8 +121,7 @@ async def test_addi(dut):
     )
 
     # Run until first WB, then check ALU result
-    cycles = await run_until_done(dut, 1, debug=False)
-    dut._log.info(f"first WB reached after {cycles} cycles")
+    await run_until_done(dut, 1, debug=False)
 
     result = int(dut.dbg_alu_result.value)
     assert result == 42, f"expected 42, got {result}"
@@ -264,10 +263,130 @@ async def test_fibonacci_rv32c(dut):
     )
 
     # 3 setup + 11 iters * 5 instrs + 2 stores = 60 instructions
-    await run_until_done(dut, 100, debug=True)
+    await run_until_done(dut, 100, debug=False)
 
     fib12 = int(dut.mem[RES_A].value)
     fib11 = int(dut.mem[RES_B].value)
     dut._log.info(f"fib(12)={fib12}, fib(11)={fib11}")
     assert fib12 == 144, f"fib(12): got {fib12}, expected 144"
     assert fib11 == 89, f"fib(11): got {fib11}, expected 89"
+
+
+@cocotb.test()
+async def test_is_prime_rv32i(dut):
+    """
+    Test if N=7 is prime via trial division. x6=1 if prime, 0 if not.
+
+    x5=N, x6=result, x7=divisor, x9=remainder
+
+    word  0: ADDI x5, x0, 7       N = 7
+    word  1: ADDI x6, x0, 1       result = 1 (assume prime)
+    word  2: ADDI x7, x0, 2       divisor = 2
+    word  3: BEQ  x7, x5, 36      if divisor==N, goto 12 (store)
+    word  4: ADDI x9, x5, 0       remainder = N
+    word  5: BLT  x9, x7, 12      if rem < div, goto 8
+    word  6: SUB  x9, x9, x7      rem -= div
+    word  7: BEQ  x0, x0, -8      goto 5
+    word  8: BNE  x9, x0, 8       if rem != 0, skip
+    word  9: ADDI x6, x0, 0       result = 0
+    word 10: ADDI x7, x7, 1       divisor++
+    word 11: BEQ  x0, x0, -32     goto 3
+    word 12: SW   x6, 200(x0)     store result
+    """
+    RES = 200
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 7),
+            rv32i.encode_addi(6, 0, 1),
+            rv32i.encode_addi(7, 0, 2),
+            rv32i.encode_beq(7, 5, 36),
+            rv32i.encode_addi(9, 5, 0),
+            rv32i.encode_blt(9, 7, 12),
+            rv32i.encode_sub(9, 9, 7),
+            rv32i.encode_beq(0, 0, -8),
+            rv32i.encode_bne(9, 0, 8),
+            rv32i.encode_addi(6, 0, 0),
+            rv32i.encode_addi(7, 7, 1),
+            rv32i.encode_beq(0, 0, -32),
+            rv32i.encode_sw(0, 6, RES),
+        ],
+    )
+    await run_until_done(dut, 200, debug=False)
+    val = int(dut.mem[RES].value)
+    dut._log.info(f"is_prime(7) = {val}")
+    assert val == 1, f"is_prime(7): got {val}, expected 1"
+
+
+@cocotb.test()
+async def test_is_not_prime_rv32i(dut):
+    """Same as test_is_prime_rv32i but N=12 (not prime, divisible by 2)."""
+    RES = 200
+    await setup(
+        dut,
+        [
+            rv32i.encode_addi(5, 0, 12),
+            rv32i.encode_addi(6, 0, 1),
+            rv32i.encode_addi(7, 0, 2),
+            rv32i.encode_beq(7, 5, 36),
+            rv32i.encode_addi(9, 5, 0),
+            rv32i.encode_blt(9, 7, 12),
+            rv32i.encode_sub(9, 9, 7),
+            rv32i.encode_beq(0, 0, -8),
+            rv32i.encode_bne(9, 0, 8),
+            rv32i.encode_addi(6, 0, 0),
+            rv32i.encode_addi(7, 7, 1),
+            rv32i.encode_beq(0, 0, -32),
+            rv32i.encode_sw(0, 6, RES),
+        ],
+    )
+    await run_until_done(dut, 500, debug=False)
+    val = int(dut.mem[RES].value)
+    dut._log.info(f"is_prime(12) = {val}")
+    assert val == 0, f"is_prime(12): got {val}, expected 0"
+
+
+@cocotb.test()
+async def test_is_prime_rv32c(dut):
+    """
+    Test if N=7 is prime using RV32C where possible.
+
+    x8=N, x9=result, x10=divisor, x11=remainder
+
+    word  0: C.LI   x9,  1
+    word  1: C.LI   x10, 2
+    word  2: C.LI   x8,  7
+    word  3: BEQ    x10, x8, 36    if div==N, goto 12
+    word  4: C.MV   x11, x8        rem = N
+    word  5: BLT    x11, x10, 12   if rem < div, goto 8
+    word  6: C.SUB  x11, x10       rem -= div
+    word  7: BEQ    x0,  x0, -8    goto 5
+    word  8: BNE    x11, x0, 8     if rem != 0, skip (C.BNEZ broken for +imm)
+    word  9: C.LI   x9,  0         result = 0
+    word 10: C.ADDI x10, 1         div++
+    word 11: BEQ    x0,  x0, -32   goto 3
+    word 12: SW     x9, 200(x0)
+    """
+    RES = 200
+    await setup(
+        dut,
+        [
+            rv32c.encode_c_li(9, 1),
+            rv32c.encode_c_li(10, 2),
+            rv32c.encode_c_li(8, 7),
+            rv32i.encode_beq(10, 8, 36),
+            rv32c.encode_c_mv(11, 8),
+            rv32i.encode_blt(11, 10, 12),
+            rv32c.encode_c_sub(11, 10),
+            rv32i.encode_beq(0, 0, -8),
+            rv32i.encode_bne(11, 0, 8),
+            rv32c.encode_c_li(9, 0),
+            rv32c.encode_c_addi(10, 1),
+            rv32i.encode_beq(0, 0, -32),
+            rv32i.encode_sw(0, 9, RES),
+        ],
+    )
+    await run_until_done(dut, 200, debug=False)
+    val = int(dut.mem[RES].value)
+    dut._log.info(f"is_prime_rv32c(7) = {val}")
+    assert val == 1, f"is_prime_rv32c(7): got {val}, expected 1"
