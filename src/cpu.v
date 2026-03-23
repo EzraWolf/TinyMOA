@@ -1,5 +1,14 @@
 // TinyMOA CPU Core
-// FSM: FETCH -> DECODE -> EXECUTE -> MEM (loads/stores only) -> WB
+// 5-stage FSM: FETCH -> DECODE -> EXECUTE -> MEM (loads/stores only) -> WB
+//
+// Word-addressed: PC counts words (1 word = 32 bits).
+//   - RV32I: PC += 1
+//   - RV32C: PC handling TBD (compressed = half-word)
+//
+// Cycle counts (TCM, same-cycle ready):
+//   ALU/LUI/AUIPC:  FETCH(1) + DECODE(1) + EXECUTE(1) + WB(1) = 4
+//   Load/Store:      FETCH(1) + DECODE(1) + EXECUTE(1) + MEM(1) + WB(1) = 5
+//   Branch/JAL/JALR: FETCH(1) + DECODE(1) + EXECUTE(1) + WB(1) = 4
 
 `default_nettype none
 `timescale 1ns / 1ps
@@ -8,44 +17,45 @@ module tinymoa_cpu (
     input  clk,
     input  nrst,
 
-    // Unified memory interface
+    // Memory bus (word-addressed)
     input             mem_ready,
     output reg [23:0] mem_addr,
     output reg        mem_read,
     output reg        mem_write,
-    output     [1:0]  mem_size,    // 00=byte, 01=half, 10=word
-    output     [31:0] mem_wdata,
-    input      [31:0] mem_rdata
+    output reg [1:0]  mem_size,
+    output reg [31:0] mem_wdata,
+    input      [31:0] mem_rdata,
+
+    // Debug
+    output [2:0]  dbg_state,
+    output        dbg_done,
+    output [23:0] dbg_pc,
+    output [31:0] dbg_instr,
+    output [31:0] dbg_alu_result
 );
+
+    // === FSM states ===
+    localparam FSM_FETCH   = 3'd0;
+    localparam FSM_DECODE  = 3'd1;
+    localparam FSM_EXECUTE = 3'd2;
+    localparam FSM_MEM     = 3'd3;
+    localparam FSM_WB      = 3'd4;
 
     // === State registers ===
     reg [2:0]  cpu_state;
-    reg [31:0] cpu_instr;     // latched from mem_rdata  in DECODE
-    reg [31:0] cpu_execute;   // latched from alu_result in EXECUTE
-    reg [31:0] cpu_writeback; // latched from mem_rdata  in MEM
+    reg [23:0] cpu_pc;
+    reg [31:0] cpu_instr;
+    reg [31:0] cpu_execute;
+    reg [31:0] cpu_writeback;
 
+    // === Debug ===
+    assign dbg_state      = cpu_state;
+    assign dbg_done       = (cpu_state == FSM_WB);
+    assign dbg_pc         = cpu_pc;
+    assign dbg_instr      = cpu_instr;
+    assign dbg_alu_result = cpu_execute;
 
-    // === Program Counter ===
-    reg         pc_en;
-    reg         pc_wen;
-    reg  [3:0]  pc_inc;
-    reg  [23:0] pc_next;
-    wire [23:0] cpu_pc;
-    wire        pc_overflow;
-
-    tinymoa_counter #(.DATA_WIDTH(24)) pc (
-        .clk     (clk),
-        .nrst    (nrst),
-        .en      (pc_en),
-        .wen     (pc_wen),
-        .inc     (pc_inc),
-        .data_in (pc_next),
-        .result  (cpu_pc),
-        .c_out   (pc_overflow)
-    );
-
-
-    // === Decoder ===
+    // === Decoder (combinational on cpu_instr) ===
     wire [31:0] decoder_imm;
     wire [3:0]  decoder_alu_opcode;
     wire [2:0]  decoder_mem_opcode;
@@ -85,8 +95,7 @@ module tinymoa_cpu (
         .is_compressed (decoder_is_compressed)
     );
 
-
-    // === Register file ===
+    // === Register file (combinational read, synchronous write) ===
     wire [31:0] regfile_rs1_data;
     wire [31:0] regfile_rs2_data;
     reg  [31:0] regfile_rd_data;
@@ -104,16 +113,17 @@ module tinymoa_cpu (
         .rd_data  (regfile_rd_data)
     );
 
-
-    // === ALU ===
+    // === ALU (combinational) ===
+    // a_in: rs1 for most ops, PC for AUIPC
+    // b_in: imm for I-type/loads/stores/AUIPC, rs2 for R-type/branches
     reg  [31:0] alu_a_in;
     reg  [31:0] alu_b_in;
     wire [31:0] alu_result;
 
-    // Defaults to rs1+imm (covers I/S/B/load/store address)
     always @(*) begin
         alu_a_in = regfile_rs1_data;
         alu_b_in = decoder_imm;
+
         if (decoder_is_alu_reg) alu_b_in = regfile_rs2_data;
         if (decoder_is_branch)  alu_b_in = regfile_rs2_data;
         if (decoder_is_auipc)   alu_a_in = {8'b0, cpu_pc};
@@ -125,98 +135,120 @@ module tinymoa_cpu (
         .b_in   (alu_b_in),
         .result (alu_result)
     );
-    
 
-    // Load sign/zero extension from cpu_writeback
+    // === Load sign/zero extension (combinational on cpu_writeback) ===
     reg [31:0] load_ext;
     always @(*) begin
         case (decoder_mem_opcode)
-            3'b000:  load_ext = {{24{cpu_writeback[7]}},  cpu_writeback[7:0]};  // LB
-            3'b100:  load_ext = {24'b0,                   cpu_writeback[7:0]};  // LBU
-            3'b001:  load_ext = {{16{cpu_writeback[15]}}, cpu_writeback[15:0]}; // LH
-            3'b101:  load_ext = {16'b0,                   cpu_writeback[15:0]}; // LHU
-            default: load_ext = cpu_writeback;                                  // LW
+            3'b000:  load_ext = {{24{cpu_writeback[7]}},  cpu_writeback[7:0]};   // LB
+            3'b100:  load_ext = {24'b0,                   cpu_writeback[7:0]};   // LBU
+            3'b001:  load_ext = {{16{cpu_writeback[15]}}, cpu_writeback[15:0]};  // LH
+            3'b101:  load_ext = {16'b0,                   cpu_writeback[15:0]};  // LHU
+            default: load_ext = cpu_writeback;                                   // LW
         endcase
     end
 
+    // === Branch condition (combinational on cpu_execute) ===
+    // BEQ/BNE: ALU does XOR, branch if result == 0 (equal)
+    // BLT/BGE: ALU does SLT, branch if result[0] == 1 (less-than)
+    // funct3[0] inverts: BNE, BGE, BGEU
+    wire branch_cond = (cpu_instr[14:13] == 2'b00) ? (cpu_execute == 32'b0)
+                                                    : cpu_execute[0];
+    wire branch_taken = decoder_is_branch && (branch_cond ^ cpu_instr[12]);
 
-    // === Memory interface ===
-    assign mem_wdata = regfile_rs2_data;
-    assign mem_size  = decoder_mem_opcode[1:0];
+    // === Write-back data mux (combinational) ===
+    wire writes_rd = decoder_is_alu_reg || decoder_is_alu_imm
+                   || decoder_is_lui || decoder_is_auipc
+                   || decoder_is_jal || decoder_is_jalr
+                   || decoder_is_load;
 
-    wire [23:0] link_addr = cpu_pc + (decoder_is_compressed ? 24'd2 : 24'd4);
+    reg [31:0] wb_data;
+    always @(*) begin
+        if (decoder_is_load)
+            wb_data = load_ext;
+        else if (decoder_is_lui)
+            wb_data = decoder_imm;
+        else if (decoder_is_jal || decoder_is_jalr)
+            wb_data = {8'b0, cpu_pc + 24'd1};
+        else
+            wb_data = cpu_execute;
+    end
 
     // === FSM ===
-    localparam FSM_FETCH   = 3'd0;
-    localparam FSM_DECODE  = 3'd1;
-    localparam FSM_EXECUTE = 3'd2;
-    localparam FSM_MEM     = 3'd3;
-    localparam FSM_WB      = 3'd4;
-
     always @(posedge clk or negedge nrst) begin
         if (!nrst) begin
             cpu_state       <= FSM_FETCH;
+            cpu_pc          <= 24'b0;
             cpu_instr       <= 32'b0;
             cpu_execute     <= 32'b0;
             cpu_writeback   <= 32'b0;
             mem_addr        <= 24'd0;
             mem_read        <= 1'b0;
             mem_write       <= 1'b0;
+            mem_size        <= 2'b10;
+            mem_wdata       <= 32'b0;
             regfile_rd_wen  <= 1'b0;
             regfile_rd_data <= 32'b0;
-            pc_en           <= 1'b0;
-            pc_wen          <= 1'b0;
-            pc_inc          <= 4'd0;
-            pc_next         <= 24'd0;
+
         end else begin
             regfile_rd_wen <= 1'b0;
-            pc_en          <= 1'b0;
-            pc_wen         <= 1'b0;
 
             case (cpu_state)
 
-                // FETCH: present cpu_pc to memory, assert mem_read.
-                // Wait here until mem_ready. TCM=1 cycle, QSPI=N cycles.
-                // When mem_ready: mem_rdata is valid -- latch into cpu_instr, go to EXECUTE.
                 FSM_FETCH: begin
-
+                    mem_addr <= cpu_pc;
+                    mem_read <= 1'b1;
+                    mem_size <= 2'b10;
+                    if (mem_ready) begin
+                        cpu_instr <= mem_rdata;
+                        mem_read  <= 1'b0;
+                        cpu_state <= FSM_DECODE;
+                    end
                 end
+
                 FSM_DECODE: begin
-                    // mem_rdata now valid. Latch instruction; decoder sees it next cycle.
-                    mem_read   <= 1'b0;
-                    cpu_instr  <= mem_rdata;
-                    cpu_state  <= FSM_EXECUTE;
+                    cpu_state <= FSM_EXECUTE;
                 end
-                // EXECUTE: cpu_instr is stable, all decoder outputs are combinational.
-                // ALU result is combinational from alu_a_in/alu_b_in.
-                // Latch alu_result into cpu_execute.
-                // Load or store -> go to MEM. Everything else -> go to WB.
-                
+
                 FSM_EXECUTE: begin
-
+                    cpu_execute <= alu_result;
+                    if (decoder_is_load || decoder_is_store)
+                        cpu_state <= FSM_MEM;
+                    else
+                        cpu_state <= FSM_WB;
                 end
 
-                // MEM: present cpu_execute[23:0] as the effective address.
-                // Load  -> assert mem_read,  wait for mem_ready, latch mem_rdata into cpu_writeback.
-                // Store -> assert mem_write, wait for mem_ready (write completes, no latch needed).
-                // Then go to WB.
                 FSM_MEM: begin
-
+                    mem_addr <= cpu_execute[23:0];
+                    mem_size <= decoder_mem_opcode[1:0];
+                    if (!mem_ready) begin
+                        // Assertion phase: drive bus signals
+                        if (decoder_is_store) begin
+                            mem_write <= 1'b1;
+                            mem_wdata <= regfile_rs2_data;
+                        end else begin
+                            mem_read <= 1'b1;
+                        end
+                    end else begin
+                        // Completion phase: clear bus and transition
+                        mem_read  <= 1'b0;
+                        mem_write <= 1'b0;
+                        if (decoder_is_load)
+                            cpu_writeback <= mem_rdata;
+                        cpu_state <= FSM_WB;
+                    end
                 end
 
-                // WB: select writeback value and write to rd.
-                //   Skip write if rd=x0, is_store, or is_branch.
-                //   ALU/AUIPC  -> cpu_execute
-                //   Load       -> load_ext (sign/zero extended cpu_writeback)
-                //   LUI        -> decoder_imm
-                //   JAL/JALR   -> link_addr (cpu_pc + 2 or +4)
-                // Update PC:
-                //   Normal           -> cpu_pc + 2 or +4
-                //   JAL              -> cpu_pc + decoder_imm[23:0]
-                //   JALR             -> cpu_execute[23:0] & 24'hFFFFFE
-                //   Branch taken     -> cpu_pc + decoder_imm[23:0]
-                //   Branch not taken -> cpu_pc + 2 or +4
                 FSM_WB: begin
+                    regfile_rd_wen  <= writes_rd;
+                    regfile_rd_data <= wb_data;
+
+                    if (branch_taken || decoder_is_jal)
+                        cpu_pc <= cpu_pc + decoder_imm[23:0];
+                    else if (decoder_is_jalr)
+                        cpu_pc <= cpu_execute[23:0];
+                    else
+                        cpu_pc <= cpu_pc + 24'd1;
 
                     cpu_state <= FSM_FETCH;
                 end
@@ -226,7 +258,6 @@ module tinymoa_cpu (
         end
     end
 
-    wire _unused = &{decoder_is_system, decoder_is_alu_imm, decoder_is_branch,
-                     decoder_is_auipc, 1'b0};
+    wire _unused = &{decoder_is_system, 1'b0};
 
 endmodule
