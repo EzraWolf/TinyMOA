@@ -28,13 +28,11 @@ module tinymoa_top (
 
     tinymoa_tcm tcm (
         .clk    (clk),
-        // Port A: CPU (inactive for M1)
-        .a_en   (1'b0),
+        .a_en   (1'b1),
         .a_wen  (1'b0),
         .a_din  (32'b0),
         .a_dout (tcm_a_dout),
         .a_addr (10'b0),
-        // Port B: DCIM (inactive for M1)
         .b_en   (1'b0),
         .b_wen  (1'b0),
         .b_din  (32'b0),
@@ -42,7 +40,6 @@ module tinymoa_top (
         .b_addr (10'b0)
     );
 
-    // Drive uo_out from a_dout to prevent macro optimization
     assign uo_out  = tcm_a_dout[7:0];
     assign uio_out = 8'b0;
     assign uio_oe  = 8'b0;
