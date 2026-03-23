@@ -35,23 +35,23 @@ module tinymoa_alu (
     reg [31:0] out;
     always @(*) begin
         case (opcode)
-            4'b0000: out = sum;                                        // ADD
-            4'b0001: out = sum;                                        // SUB
-            4'b0010: out = {31'd0, $signed(a_in) < $signed(b_in)};    // SLT
-            4'b0011: out = {31'd0, a_in < b_in};                      // SLTU
+            4'b0000: out = sum;                                    // ADD
+            4'b0001: out = sum;                                    // SUB
+            4'b0010: out = {31'd0, $signed(a_in) < $signed(b_in)}; // SLT
+            4'b0011: out = {31'd0, a_in < b_in};                   // SLTU
 
-            4'b0100: out = a_in ^ b_in;                                // XOR
-            4'b0101: out = a_in | b_in;                                // OR
-            4'b0110: out = a_in & b_in;                                // AND
+            4'b0100: out = a_in ^ b_in;                            // XOR
+            4'b0101: out = a_in | b_in;                            // OR
+            4'b0110: out = a_in & b_in;                            // AND
 
-            4'b1000: out = a_in << b_in[4:0];                         // SLL
-            4'b1001: out = a_in >> b_in[4:0];                         // SRL
-            4'b1010: out = $unsigned($signed(a_in) >>> b_in[4:0]);    // SRA
+            4'b1000: out = a_in << b_in[4:0];                      // SLL
+            4'b1001: out = a_in >> b_in[4:0];                      // SRL
+            4'b1010: out = $unsigned($signed(a_in) >>> b_in[4:0]); // SRA
 
-            4'b1011: out = a_in[15:0] * b_in[15:0];                   // MUL
+            4'b1011: out = a_in[15:0] * b_in[15:0];                // MUL
             
-            4'b1110: out = (b_in == 32'd0) ? 32'd0 : a_in;           // CZERO.EQZ
-            4'b1111: out = (b_in != 32'd0) ? 32'd0 : a_in;           // CZERO.NEZ
+            4'b1110: out = (b_in == 32'd0) ? 32'd0 : a_in;         // CZERO.EQZ
+            4'b1111: out = (b_in != 32'd0) ? 32'd0 : a_in;         // CZERO.NEZ
             default: out = 32'd0;
         endcase
     end
