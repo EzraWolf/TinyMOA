@@ -236,169 +236,328 @@ def verify_c_lui(dut, rd, imm):
 
 
 # CIW-Type
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_addi4spn(dut):
+    # C.ADDI4SPN rd', nzuimm -> addi rd', x2, nzuimm
+    # rs1 implicit x2 (sp), rd' = x8-x15, imm word-aligned 4-1020
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_addi4spn(rd=8, imm=4))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=8, rs1=2, imm=4)
+
+
+@cocotb.test()
+async def test_c_addi4spn_max(dut):
+    # Maximum nzuimm=1020 (all imm bits set) exercises all scrambled bit positions
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_addi4spn(rd=15, imm=1020))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=15, rs1=2, imm=1020)
 
 
 # CL
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_lw(dut):
+    # C.LW rd', imm(rs1') -> lw rd', imm(rs1')
+    # rd', rs1' prime (x8-x15), imm word-aligned 0-124
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_lw(rd=8, rs1=9, imm=4))
+    verify_c_load(dut, mem_opcode=MEM_WORD, rd=8, rs1=9, imm=4)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_lw_max(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_lw(rd=10, rs1=11, imm=124))
+    verify_c_load(dut, mem_opcode=MEM_WORD, rd=10, rs1=11, imm=124)
+
+
+@cocotb.test()
 async def test_c_lbu(dut):
+    # C.LBU rd', imm(rs1') -> lbu rd', imm(rs1')
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_lbu(rd=8, rs1=9, imm=1))
+    verify_c_load(dut, mem_opcode=MEM_BYTE_U, rd=8, rs1=9, imm=1)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_lbu_imm3(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_lbu(rd=8, rs1=9, imm=3))
+    verify_c_load(dut, mem_opcode=MEM_BYTE_U, rd=8, rs1=9, imm=3)
+
+
+@cocotb.test()
 async def test_c_lhu(dut):
+    # C.LHU rd', imm(rs1') -> lhu rd', imm(rs1')
+    # imm[1] only, halfword-aligned (0 or 2)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_lhu(rd=8, rs1=9, imm=2))
+    verify_c_load(dut, mem_opcode=MEM_HALF_U, rd=8, rs1=9, imm=2)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_lh(dut):
+    # C.LH rd', imm(rs1') -> lh rd', imm(rs1')
+    # signed halfword; imm[1] only (0 or 2)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_lh(rd=8, rs1=9, imm=2))
+    verify_c_load(dut, mem_opcode=MEM_HALF, rd=8, rs1=9, imm=2)
 
 
 # CS
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_sw(dut):
+    # C.SW rs2', imm(rs1') -> sw rs2', imm(rs1')
+    # rs1', rs2' prime (x8-x15), imm word-aligned 0-124
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_sw(rs1=8, rs2=9, imm=4))
+    verify_c_store(dut, mem_opcode=MEM_WORD, rs1=8, rs2=9, imm=4)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_sw_max(dut):
+    # Maximum offset=124
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_sw(rs1=10, rs2=11, imm=124))
+    verify_c_store(dut, mem_opcode=MEM_WORD, rs1=10, rs2=11, imm=124)
+
+
+@cocotb.test()
 async def test_c_sb(dut):
+    # C.SB rs2', imm(rs1') -> sb rs2', imm(rs1')
+    # imm[1:0] unsigned byte offset 0-3
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_sb(rs1=8, rs2=9, imm=1))
+    verify_c_store(dut, mem_opcode=MEM_BYTE, rs1=8, rs2=9, imm=1)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_sh(dut):
+    # C.SH rs2', imm(rs1') -> sh rs2', imm(rs1')
+    # imm[1] only, halfword-aligned (0 or 2)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_sh(rs1=8, rs2=9, imm=2))
+    verify_c_store(dut, mem_opcode=MEM_HALF, rs1=8, rs2=9, imm=2)
 
 
 # === Quadrant 1 ===
 
 
 # CI
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_nop(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_nop())
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=0, rs1=0, imm=0)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_addi(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_addi(rd=5, imm=4))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=5, rs1=5, imm=4)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_addi_neg(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_addi(rd=5, imm=-4))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=5, rs1=5, imm=-4)
+
+
+@cocotb.test()
 async def test_c_li(dut):
+    # rs1 always x0, unlike C.ADDI where rs1==rd
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_li(rd=5, imm=4))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=5, rs1=0, imm=4)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_li_neg(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_li(rd=5, imm=-4))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=5, rs1=0, imm=-4)
+
+
+@cocotb.test()
 async def test_c_addi16sp(dut):
+    # rd and rs1 always x2; imm is pre-scaled by 16 in encoding
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_addi16sp(imm=16))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=2, rs1=2, imm=16)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_addi16sp_neg(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_addi16sp(imm=-16))
+    verify_c_alu_imm(dut, alu_opcode=0b0000, rd=2, rs1=2, imm=-16)
+
+
+@cocotb.test()
 async def test_c_lui(dut):
+    # nzimm[17:12] decoded to imm[31:12]; verify_c_lui checks .integer (unsigned)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_lui(rd=5, imm=0x5000))
+    verify_c_lui(dut, rd=5, imm=0x5000)
+
+
+@cocotb.test()
+async def test_c_lui_neg(dut):
+    # nzimm[17]=1 sign-extends into bits[31:17], producing a negative upper immediate
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_lui(rd=5, imm=0xFFFFF000))
+    verify_c_lui(dut, rd=5, imm=0xFFFFF000)
 
 
 # CA
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_sub(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_sub(rd=8, rs2=9))
+    verify_c_alu_reg(dut, alu_opcode=0b0001, rd=8, rs2=9)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_xor(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_xor(rd=8, rs2=9))
+    verify_c_alu_reg(dut, alu_opcode=0b0100, rd=8, rs2=9)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_or(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_or(rd=8, rs2=9))
+    verify_c_alu_reg(dut, alu_opcode=0b0101, rd=8, rs2=9)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_and(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_and(rd=8, rs2=9))
+    verify_c_alu_reg(dut, alu_opcode=0b0110, rd=8, rs2=9)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_mul(dut):
+    # Zcb; operates on lower 16 bits, alu_opcode=MUL=0b1011
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_mul(rd=8, rs2=9))
+    verify_c_alu_reg(dut, alu_opcode=0b1011, rd=8, rs2=9)
+
+
+@cocotb.test()
+async def test_c_not(dut):
+    # Zcb single-register; expands to xori rd', rd', -1 so is_alu_imm with imm=-1
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_not(rd=8))
+    verify_c_alu_imm(dut, alu_opcode=0b0100, rd=8, rs1=8, imm=-1)
+
+
+# Zcb sign/zero-extend single-register (requires Zbb, not implemented)
+@cocotb.test(skip=True)
+async def test_c_zext_b(dut):
+    # Requires Zbb extension
     await setup(dut)
     raise NotImplementedError
 
 
 @cocotb.test(skip=True)
-async def test_c_not(dut):
+async def test_c_sext_b(dut):
+    # Requires Zbb extension
+    await setup(dut)
+    raise NotImplementedError
+
+
+@cocotb.test(skip=True)
+async def test_c_zext_h(dut):
+    # Requires Zbb extension
+    await setup(dut)
+    raise NotImplementedError
+
+
+@cocotb.test(skip=True)
+async def test_c_sext_h(dut):
+    # Requires Zbb extension
     await setup(dut)
     raise NotImplementedError
 
 
 # CB
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_srli(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_srli(rd=8, shamt=3))
+    verify_c_alu_imm(dut, alu_opcode=0b1001, rd=8, rs1=8, imm=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_srai(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_srai(rd=8, shamt=3))
+    verify_c_alu_imm(dut, alu_opcode=0b1010, rd=8, rs1=8, imm=3)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_andi(dut):
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_andi(rd=8, imm=4))
+    verify_c_alu_imm(dut, alu_opcode=0b0110, rd=8, rs1=8, imm=4)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_andi_neg(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_andi(rd=8, imm=-4))
+    verify_c_alu_imm(dut, alu_opcode=0b0110, rd=8, rs1=8, imm=-4)
+
+
+@cocotb.test()
 async def test_c_beqz(dut):
+    # rs2 always x0 (not encoded)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_beqz(rs1=8, imm=4))
+    verify_c_branch(dut, rs1=8, imm=4)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_bnez(dut):
+    # rs2 always x0 (not encoded)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_bnez(rs1=8, imm=-2))
+    verify_c_branch(dut, rs1=8, imm=-2)
 
 
 # CJ
-@cocotb.test(skip=True)
+@cocotb.test()
 async def test_c_j(dut):
+    # rd always x0 (no link)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_j(imm=8))
+    verify_c_jal(dut, rd=0, imm=8)
 
 
-@cocotb.test(skip=True)
+@cocotb.test()
+async def test_c_j_neg(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_j(imm=-2))
+    verify_c_jal(dut, rd=0, imm=-2)
+
+
+@cocotb.test()
 async def test_c_jal(dut):
+    # rd always x1 (RV32 only; no RV64 equivalent)
     await setup(dut)
-    raise NotImplementedError
+    await decode(dut, rv32c.encode_c_jal(imm=8))
+    verify_c_jal(dut, rd=1, imm=8)
+
+
+@cocotb.test()
+async def test_c_jal_neg(dut):
+    await setup(dut)
+    await decode(dut, rv32c.encode_c_jal(imm=-2))
+    verify_c_jal(dut, rd=1, imm=-2)
 
 
 # === Quadrant 2 ===
