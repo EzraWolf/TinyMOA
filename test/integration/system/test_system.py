@@ -301,3 +301,130 @@ async def test_par_load_tcm_and_cpu_executes(dut):
     assert result == 0x1A0, (
         f"CPU->DCIM roundtrip: expected 0x1A0 at TCM[0x20], got 0x{result:08X}"
     )
+
+
+@cocotb.test()
+async def test_cpu_triggers_dcim_compute(dut):
+    """CPU starts DCIM inference, polls for done, reads result from TCM.
+
+    All-ones weights (16 words at 0x1A0), all-ones activation (1 word at 0x1C0).
+    16x16, 1-bit precision. Expected result per column: 16.
+    CPU writes CTRL, polls STATUS, loads result[0], stores to TCM[0x30].
+    """
+    await setup(dut)
+
+    # Pre-load weights (16 words of 0xFFFF at 0x1A0) and activation (0xFFFF at 0x1C0)
+    weight_data = [0x0000FFFF] * 16
+    act_data = [0x0000FFFF]
+
+    await par_load_words(dut, 1, weight_data)  # region 1 = 0x1A0
+    await par_load_words(dut, 2, act_data)     # region 2 = 0x1C0
+
+    # Verify weights loaded
+    for i in range(16):
+        val = int(dut.dut.tcm.mem[0x1A0 + i].value)
+        assert val == 0xFFFF, f"weight[{i}] = 0x{val:08X}, expected 0xFFFF"
+    val = int(dut.dut.tcm.mem[0x1C0].value)
+    assert val == 0xFFFF, f"act[0] = 0x{val:08X}, expected 0xFFFF"
+
+    # CPU program:
+    #  0: LUI x4, 0x400         # x4 = 0x400000 (DCIM MMIO base)
+    #  1: ADDI x10, x0, 0x13    # x10 = 0x13 (reload=1, prec=1, start=1)
+    #  2: SW x10, 0x00(x4)      # CTRL = 0x13 -> start inference
+    #  3: LW x11, 0x04(x4)      # x11 = STATUS
+    #  4: ANDI x11, x11, 0x2    # x11 &= DONE bit
+    #  5: BEQ x11, x0, -8       # loop to 3 if not done
+    #  6: ADDI x12, x0, 0x1E0   # x12 = result base address
+    #  7: LW x13, 0x00(x12)     # x13 = result[0]
+    #  8: SW x0, x13, 0x30       # TCM[0x30] = result[0]
+    #  9: BEQ x0, x0, 0          # self-loop
+    program = [
+        rv32i.encode_lui(4, 0x400),
+        rv32i.encode_addi(10, 0, 0x13),
+        rv32i.encode_sw(4, 10, 0x00),
+        rv32i.encode_lw(11, 4, 0x04),
+        rv32i.encode_andi(11, 11, 0x2),
+        rv32i.encode_beq(11, 0, -8),
+        rv32i.encode_addi(12, 0, 0x1E0),
+        rv32i.encode_lw(13, 12, 0x00),
+        rv32i.encode_sw(0, 13, 0x30),
+        rv32i.encode_beq(0, 0, 0),
+    ]
+
+    await par_load_words(dut, 0, program)
+
+    # Release CPU and exit PAR mode so port B is free for DCIM
+    dut.par_we.value = 0
+    dut.par_cpu_nrst.value = 1
+    dut.is_parallel.value = 0
+
+    # Wait long enough for inference + CPU polling + result read
+    names = ["FETCH", "DECODE", "EXEC", "MEM", "WB"]
+    for cyc in range(300):
+        await ClockCycles(dut.clk, 1)
+        try:
+            st = int(dut.cpu_state.value)
+            pc = int(dut.cpu_pc.value)
+            sn = names[st] if st < len(names) else f"?{st}"
+            ready = int(dut.dut.cpu_mem_ready.value)
+            rd = int(dut.dut.cpu_mem_read.value)
+            wr = int(dut.dut.cpu_mem_write.value)
+            addr = int(dut.dut.cpu_mem_addr.value)
+            ds = int(dut.dcim_state.value)
+            dut._log.info(
+                f"cy{cyc:3d} {sn:<6s} pc={pc} addr=0x{addr:06X} rd={rd} wr={wr} rdy={ready} dcim={ds}"
+            )
+            if pc == 9:
+                dut._log.info(f"cy{cyc:3d} CPU reached self-loop at PC=9")
+                break
+        except Exception as e:
+            dut._log.info(f"cy{cyc:3d} X values: {e}")
+    else:
+        assert False, "CPU never reached self-loop (PC=9) within 300 cycles"
+
+    # Debug: check weights in TCM
+    for i in range(4):
+        try:
+            wv = int(dut.dut.tcm.mem[0x1A0 + i].value)
+            dut._log.info(f"TCM[0x{0x1A0+i:03X}] = 0x{wv:08X}")
+        except ValueError:
+            dut._log.error(f"TCM[0x{0x1A0+i:03X}] = X (weight lost!)")
+
+    # Debug: check DCIM internals
+    try:
+        sa0 = int(dut.dut.dcim.shift_acc[0].value)
+        dut._log.info(f"DCIM shift_acc[0] = {sa0}")
+    except ValueError:
+        dut._log.error("DCIM shift_acc[0] = X")
+    try:
+        br = int(dut.dut.dcim.bias_reg.value)
+        dut._log.info(f"DCIM bias_reg = {br}")
+    except ValueError:
+        dut._log.error("DCIM bias_reg = X")
+    try:
+        w0 = int(dut.dut.dcim.weight_reg[0].value)
+        dut._log.info(f"DCIM weight_reg[0] = 0x{w0:04X}")
+    except ValueError:
+        dut._log.error("DCIM weight_reg[0] = X")
+
+    # Debug: check DCIM results at 0x1E0
+    for i in range(4):
+        try:
+            v = int(dut.dut.tcm.mem[0x1E0 + i].value)
+            dut._log.info(f"TCM[0x{0x1E0+i:03X}] = {v} (0x{v:08X})")
+        except ValueError:
+            dut._log.error(f"TCM[0x{0x1E0+i:03X}] = X")
+
+    # Check TCM[0x30] for the DCIM result
+    try:
+        result = int(dut.dut.tcm.mem[0x30].value)
+    except ValueError:
+        assert False, "TCM[0x30] is X - CPU never wrote the result"
+
+    # Convert to signed
+    if result >= 0x80000000:
+        result -= 0x100000000
+
+    assert result == 16, (
+        f"CPU-DCIM compute: expected 16 at TCM[0x30], got {result}"
+    )

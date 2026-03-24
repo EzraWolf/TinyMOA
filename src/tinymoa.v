@@ -217,9 +217,10 @@ module tinymoa_top (
     wire [31:0] tcm_b_dout;
 
     wire dcim_b_active = dcim_mem_read | dcim_mem_write;
-    wire par_tcm_win   = par_is_tcm & ~dcim_b_active;
+    wire dcim_b_busy   = (dbg_dcim_state != 3'd0) & (dbg_dcim_state != 3'd5);
+    wire par_tcm_win   = par_is_tcm & ~dcim_b_busy;
 
-    wire        tcm_b_en   = par_tcm_win ? (par_rdy | par_oe) : dcim_b_active;
+    wire        tcm_b_en   = par_tcm_win ? (par_rdy | par_oe) : (dcim_b_active | dcim_b_busy);
     wire        tcm_b_wen  = par_tcm_win ? par_rdy             : dcim_mem_write;
     wire [9:0]  tcm_b_addr = par_tcm_win ? par_word_addr       : dcim_mem_addr;
     wire [31:0] tcm_b_din  = par_tcm_win ? par_word_buf        : dcim_mem_wdata;
