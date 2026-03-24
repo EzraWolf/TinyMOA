@@ -45,7 +45,7 @@
 
 module tinymoa_dcim #(
     parameter ARRAY_DIM = 16, // NxN array
-    parameter ACC_WIDTH = 8   // max value = N*(2^P-1) = 16*15 = 240
+    parameter ACC_WIDTH = 9   // max value = N*(2^P-1)
 )(
     input clk,
     input nrst,
@@ -68,14 +68,14 @@ module tinymoa_dcim #(
     output [2:0] dbg_state
 );
 
-    // MMIO config registers are wrote by the CPU before asserting cfg_start
+    // MMIO config registers
     reg        cfg_start;
     reg        cfg_reload_weights;
     reg [2:0]  cfg_precision;    // bit-planes per activation: 1, 2, or 4
-    reg [9:0]  cfg_weight_base;  // TCM word address of weight row 0  (default 0x1A0)
-    reg [9:0]  cfg_act_base;     // TCM word address of activation word 0 (default 0x1C0)
-    reg [9:0]  cfg_result_base;  // TCM word address for result writeback  (default 0x1E0)
-    reg [5:0]  cfg_array_size;   // active rows/cols (default 32, max 64)
+    reg [9:0]  cfg_weight_base;  // TCM word address of weight row 0  (default 0x180)
+    reg [9:0]  cfg_act_base;     // TCM word address of activation word 0 (default 0x1A0)
+    reg [9:0]  cfg_result_base;  // TCM word address for result writeback  (default 0x1B0)
+    reg [5:0]  cfg_array_size;   // active rows/cols (default ARRAY_DIM, max 64)
 
     reg [1:0]  status_reg;       // bit 0 = BUSY, bit 1 = DONE
 
@@ -134,10 +134,10 @@ module tinymoa_dcim #(
             cfg_start          <= 1'b0;
             cfg_reload_weights <= 1'b1;
             cfg_precision      <= 3'd1;
-            cfg_weight_base    <= 10'h1A0;
-            cfg_act_base       <= 10'h1C0;
-            cfg_result_base    <= 10'h1E0;
-            cfg_array_size     <= 6'd16;
+            cfg_weight_base    <= 10'h180;
+            cfg_act_base       <= 10'h1A0;
+            cfg_result_base    <= 10'h1B0;
+            cfg_array_size     <= ARRAY_DIM[5:0];
             mmio_ready         <= 1'b0;
             mmio_rdata         <= 32'd0;
         end else begin
