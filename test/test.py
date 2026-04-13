@@ -42,7 +42,7 @@ def run_test(
         module=module,
         simulator="icarus",
         defines=defines or [],
-        sim_build=str(SIM_BUILD / src_module),
+        sim_build=str(SIM_BUILD / test_type / src_module),
         python_search=[str(PROJECT_DIR)],
     )
 
@@ -71,6 +71,7 @@ def test_dcim_integration():
         dir="dcim",
         test_type="integration",
         extra_sources=["dcim/compressor.v"],
+        defines=["EXACT_COMPRESSOR"],
     )
 
 
@@ -92,8 +93,8 @@ def test_system_integration():
         toplevel="tb_system",
         module="integration.system.test_system",
         simulator="icarus",
-        defines=["BEHAVIORAL"],
-        sim_build=str(SIM_BUILD / "system"),
+        defines=["BEHAVIORAL", "EXACT_COMPRESSOR"],
+        sim_build=str(SIM_BUILD / "integration" / "system"),
         python_search=[str(PROJECT_DIR)],
     )
 
@@ -127,7 +128,13 @@ def test_cpu_unit():
 
 
 def test_dcim_unit():
-    run_test("dcim", "dcim", dir="dcim", extra_sources=["dcim/compressor.v"])
+    run_test(
+        "dcim",
+        "dcim",
+        dir="dcim",
+        extra_sources=["dcim/compressor.v"],
+        defines=["EXACT_COMPRESSOR"],
+    )
 
 
 def test_decoder_rv32c_unit():

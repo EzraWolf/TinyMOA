@@ -562,7 +562,16 @@ async def test_dcim_random_dotprod(dut):
     await io_write_byte(dut, (a >> 24) & 0xFF)
     await io_execute(dut, RW)
 
-    # 3. CTRL = 0x13 (reload=1, prec=1, start=1). Defaults are already correct.
+    # 3. Program ARRAY_SIZE = 16 explicitly to match N in this test.
+    await io_write_byte(dut, 0x14, addr_load=1)
+    await io_write_byte(dut, 0x00, addr_load=1)
+    await io_write_byte(dut, 0x10, target=1)
+    await io_write_byte(dut, 0x00, target=1)
+    await io_write_byte(dut, 0x00, target=1)
+    await io_write_byte(dut, 0x00, target=1)
+    await io_execute(dut, TARGET | RW)
+
+    # 4. CTRL = 0x13 (reload=1, prec=1, start=1)
     await io_write_byte(dut, 0x00, addr_load=1)
     await io_write_byte(dut, 0x00, addr_load=1)
     await io_write_byte(dut, 0x13, target=1)

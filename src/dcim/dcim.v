@@ -98,18 +98,34 @@ module tinymoa_dcim #(
     wire [4:0] comp_hi_out [0:ARRAY_DIM-1]; // 32x32 array
     wire [5:0] popcount [0:ARRAY_DIM-1];
 
+    // Mask inactive rows when cfg_array_size < ARRAY_DIM.
+    // This keeps popcount and bias in the same effective dimension.
+    function [ARRAY_DIM-1:0] active_row_mask;
+        input [5:0] size;
+        integer r;
+        begin
+            active_row_mask = {ARRAY_DIM{1'b0}};
+            for (r = 0; r < ARRAY_DIM; r = r + 1)
+                if (r < size)
+                    active_row_mask[r] = 1'b1;
+        end
+    endfunction
+
+    wire [ARRAY_DIM-1:0] row_mask = active_row_mask(cfg_array_size);
+
     genvar col;
     generate
         for (col = 0; col < ARRAY_DIM; col = col + 1) begin : gen_col
             wire [ARRAY_DIM-1:0] xnor_bits = ~(weight_reg[col] ^ act_slice);
+            wire [ARRAY_DIM-1:0] xnor_active = xnor_bits & row_mask;
 
             tinymoa_compressor comp_lo (
-                .in  (xnor_bits[15:0]),
+                .in  (xnor_active[15:0]),
                 .out (comp_lo_out[col])
             );
 
             tinymoa_compressor comp_hi (
-                .in  (xnor_bits[31:16]),
+                .in  (xnor_active[31:16]),
                 .out (comp_hi_out[col])
             );
 

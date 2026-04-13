@@ -63,7 +63,7 @@ async def mmio_write(dut, addr, data):
     dut.mmio_addr.value = addr
     dut.mmio_wdata.value = data
     await RisingEdge(dut.clk)
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     assert int(dut.mmio_ready.value) == 1, (
         f"mmio_ready not asserted for write to 0x{addr:02X}"
     )
@@ -75,7 +75,7 @@ async def mmio_read(dut, addr):
     dut.mmio_read.value = 1
     dut.mmio_addr.value = addr
     await RisingEdge(dut.clk)
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     assert int(dut.mmio_ready.value) == 1, (
         f"mmio_ready not asserted for read from 0x{addr:02X}"
     )
@@ -89,20 +89,20 @@ async def mem_preload(dut, memory_dict):
     for addr, data in memory_dict.items():
         # Set signals AFTER posedge so RTL sees them at the NEXT posedge.
         await RisingEdge(dut.clk)
-        await Timer(1, units="ns")
+        await Timer(1, unit="ns")
         dut.tb_mem_wen.value = 1
         dut.tb_mem_addr.value = addr
         dut.tb_mem_wdata.value = data
     # One extra edge to clock in the last write
     await RisingEdge(dut.clk)
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.tb_mem_wen.value = 0
 
 
 async def mem_read_tb(dut, addr):
     """Read one word from testbench memory (combinational read port, needs simulator tick)."""
     dut.tb_mem_raddr.value = addr
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     return int(dut.tb_mem_rdata.value)
 
 
@@ -296,12 +296,11 @@ async def end_to_end_all_ones_1bit(dut):
 @cocotb.test()
 async def end_to_end_half_ones_1bit(dut):
     """
-    First 8 weight rows = all-ones, last 8 = all-zeros.
+    First half of weight rows = all-ones, second half = all-zeros.
     Activation = all-ones, 1-bit precision.
 
-    After transpose, weight_reg[col] has bits [7:0]=1, [15:8]=0.
-    XNOR with all-ones activation: popcount = 8.
-    bias = 16. signed = 2*8 - 16 = 0.
+    For ARRAY_DIM rows this yields popcount = ARRAY_DIM/2.
+    bias = ARRAY_DIM. signed = 2*(ARRAY_DIM/2) - ARRAY_DIM = 0.
     """
     expected = 0
     await setup(dut)

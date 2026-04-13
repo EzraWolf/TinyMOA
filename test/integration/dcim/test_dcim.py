@@ -31,10 +31,10 @@ ABASE_ADDR = 0x0C  # cfg_act_base    [9:0]
 RBASE_ADDR = 0x10  # cfg_result_base [9:0]
 SIZE_ADDR = 0x14  # cfg_array_size  [5:0]
 
-DEFAULT_WEIGHT_BASE = 0x1A0  # 416
-DEFAULT_ACT_BASE = 0x1C0  # 448
-DEFAULT_RESULT_BASE = 0x1E0  # 480
-DEFAULT_ARRAY_SIZE = 16
+DEFAULT_WEIGHT_BASE = 0x180
+DEFAULT_ACT_BASE = 0x1A0
+DEFAULT_RESULT_BASE = 0x1B0
+DEFAULT_ARRAY_SIZE = 32
 ARRAY_DIM = 16
 
 
@@ -64,7 +64,7 @@ async def mmio_write(dut, addr, data):
     dut.mmio_addr.value = addr
     dut.mmio_wdata.value = data
     await RisingEdge(dut.clk)
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     assert int(dut.mmio_ready.value) == 1, (
         f"mmio_ready not asserted for write to 0x{addr:02X}"
     )
@@ -76,7 +76,7 @@ async def mmio_read(dut, addr):
     dut.mmio_read.value = 1
     dut.mmio_addr.value = addr
     await RisingEdge(dut.clk)
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     assert int(dut.mmio_ready.value) == 1, (
         f"mmio_ready not asserted for read from 0x{addr:02X}"
     )
@@ -89,12 +89,12 @@ async def mem_preload(dut, memory_dict):
     """Write all entries in memory_dict into the testbench memory."""
     for addr, data in memory_dict.items():
         await RisingEdge(dut.clk)
-        await Timer(1, units="ns")
+        await Timer(1, unit="ns")
         dut.tb_mem_wen.value = 1
         dut.tb_mem_addr.value = addr
         dut.tb_mem_wdata.value = data
     await RisingEdge(dut.clk)
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.tb_mem_wen.value = 0
     await ClockCycles(dut.clk, 1)
 
@@ -102,7 +102,7 @@ async def mem_preload(dut, memory_dict):
 async def mem_read_tb(dut, addr):
     """Read one word from testbench memory (combinational read port)."""
     dut.tb_mem_raddr.value = addr
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     return int(dut.tb_mem_rdata.value)
 
 
@@ -115,6 +115,7 @@ def make_ctrl(cfg_start=0, cfg_precision=1, cfg_reload_weights=1):
 
 async def start_inference(dut, reload_weights=True, precision=1):
     """Write control register to start inference."""
+    await mmio_write(dut, SIZE_ADDR, ARRAY_DIM)
     ctrl = make_ctrl(
         cfg_start=1, cfg_precision=precision, cfg_reload_weights=int(reload_weights)
     )
