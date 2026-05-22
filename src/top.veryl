@@ -1,0 +1,7 @@
+// Entry point and bus fabric for all of TinyMOA
+pub module top (
+    clk: input clock,
+    rst: input reset,
+) {
+    // a
+}
