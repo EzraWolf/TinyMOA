@@ -2,24 +2,6 @@
 
 LLM inference should be transparent and not require a datacenter. TinyMOA is a transformer accelerator that runs inference directly in memory.
 
-a
-
-a
-
-a
-
-a
-
-a
-
-a
-
-a
-
-a
-
-a
-
 ## Quickstart
 
 Insallation
@@ -29,11 +11,6 @@ example program
 ```
 
 ## Architecture
-
-### CPU Core
-
-RV32EC, nibble-serial, 6-state pipeline:
-
 
 ### ISA
 
@@ -48,12 +25,8 @@ RV32EC, nibble-serial, 6-state pipeline:
 | M (multiply) | Not implemented - opcodes reserved, C.MUL covers the common case |
 | F (float) | Not implemented - opcodes reserved |
 
+### CPU Core
+
+RV32EC, nibble-serial, 6-state pipeline:
+
 ### DCIM Accelerator
-
-
-
-
-
-A minimal RISC-V CPU with a Digital Compute-in-Memory (DCIM) accelerator for neural network inference. TinyMOA is built on a 4-bit nibble-serial datapath targeting IHP SG13G2 130nm via [TinyTapeout IHP26a](https://tinytapeout.com/).
-
-The CPU is directly based on [TinyQV](https://github.com/MichaelBell/tinyQV) by [Michael Bell](https://github.com/MichaelBell), and while structurally overhauled to support DCIM and Tighly Coupled Memory (TCM), the serial 4-bit bus architecture, register file design, and pipeline structure are all his work. *TinyMOA would not exist without it.*
