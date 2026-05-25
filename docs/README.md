@@ -1,1 +1,3 @@
+# TinyMOA Docs
+
 WIP
