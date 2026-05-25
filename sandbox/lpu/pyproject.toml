@@ -1,0 +1,7 @@
+[project]
+name = "tinymoa-lpu-sandbox"
+version = "0.1.0"
+description = "Sandbox for the TinyMOA LPU"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []

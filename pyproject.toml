@@ -18,3 +18,10 @@ dependencies = [
 dev = [
     "ruff>=0.15.2",
 ]
+
+[tool.uv.workspace]
+members = [
+    "sandbox/cpu",
+    "sandbox/lpu",
+    "test",
+]
