@@ -1,6 +1,6 @@
 # TinyMOA
 
-LLM inference should be transparent and not require a datacenter. TinyMOA is a transformer accelerator that runs inference directly in memory.
+LLM inference should be transparent and not require a datacenter. TinyMOA is an inference accelerator for transformer models using compute-in-memory (CIM) cores.
 
 ## Quickstart
 
