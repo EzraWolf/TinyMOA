@@ -1,1 +1,73 @@
+// I64 ALU
 
+// RV64I base ALU ops
+pub package cpu_pkg_alu {
+    enum AluOp: logic<4> {
+
+        ADD = 4'b0000, // ADDI
+        ADDW = 4'b0001, // ADDIW
+        SUB = 4'b0010, // SUBI
+        SUBW = 4'b0011, // SUBIW
+
+        OR = 4'b0100, // ORI
+        AND = 4'b0101, // ANDI
+        XOR = 4'b0110, // XORI
+
+        SLT = 4'b0111, // SLTI
+        SLTU = 4'b1000, // SLTIU
+
+        SLL = 4'b1001, // SLLI
+        SLLW = 4'b1010, // SLLIW
+        SRL = 4'b1011, // SRLI
+        SRLW = 4'b1100, // SRLIW
+        SRA = 4'b1101, // SRAI
+        SRAW = 4'b1110, // SRAIW
+    }
+}
+
+pub module cpu_alu (
+    i_op : input  AluOp    ,
+    i_a  : input  logic<64>,
+    i_b  : input  logic<64>,
+    o_out: output logic<64>,
+) {
+    import cpu_pkg_alu::AluOp;
+
+    var result : logic<64>;
+    let shamt  : logic<6>  = i_b[5:0];
+    let shamt32: logic<5>  = i_b[4:0];
+
+    let i_a32: logic<32> = i_a[31:0];
+    let i_b32: logic<32> = i_b[31:0];
+
+    let add32: logic<32> = i_a32 + i_b32;
+    let sub32: logic<32> = i_a32 - i_b32;
+    let sll32: logic<32> = i_a32 << shamt32;
+    let srl32: logic<32> = i_a32 >> shamt32;
+    let sra32: logic<32> = $signed(i_a32) >>> shamt32;
+
+    always_comb {
+        case (i_op) {
+            AluOp::ADD : result = i_a + i_b;
+            AluOp::ADDW: result = {add32[31] repeat 32, add32};
+            AluOp::SUB : result = i_a - i_b;
+            AluOp::SUBW: result = {sub32[31] repeat 32, sub32};
+            AluOp::OR  : result = i_a | i_b;
+            AluOp::AND : result = i_a & i_b;
+            AluOp::XOR : result = i_a ^ i_b;
+
+            AluOp::SLL : result = i_a << shamt;
+            AluOp::SLLW: result = {sll32[31] repeat 32, sll32};
+            AluOp::SRL : result = i_a >> shamt;
+            AluOp::SRLW: result = {srl32[31] repeat 32, srl32};
+            AluOp::SRA : result = $signed(i_a) >>> shamt;
+            AluOp::SRAW: result = {sra32[31] repeat 32, sra32};
+
+            AluOp::SLT : result = {63'b0, $signed(i_a) <: $signed(i_b)};
+            AluOp::SLTU: result = {63'b0, i_a <: i_b};
+
+            default: result = 64'b0;
+        }
+    }
+    assign o_out = result;
+}
