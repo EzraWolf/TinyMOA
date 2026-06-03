@@ -42,10 +42,7 @@ pub module lpu_corelet::<IN_WIDTH: u16 = 32, ACT_BITS: u16 = 6> (
 
     for column in 0..IN_WIDTH :gen_matmul_crossbar {
         let xnor: logic<IN_WIDTH> = ~(weights[column] ^ data_in);
-        inst u_comp: lpu_compressor_s::<IN_WIDTH> (
-            i_data: xnor            ,
-            o_data: popcount[column],
-        );
+        inst u_comp: lpu_compressor_s::<IN_WIDTH> ( i_data: xnor, o_data: popcount[column] );
     }
 
     always_ff (clk, rst) {

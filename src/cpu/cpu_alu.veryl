@@ -66,7 +66,7 @@ pub module cpu_alu (
             AluOp::SLT : result = {63'b0, $signed(i_a) <: $signed(i_b)};
             AluOp::SLTU: result = {63'b0, i_a <: i_b};
 
-            default: result = 64'b0;
+            default    : result = 64'b0;
         }
     }
     assign o_out = result;
