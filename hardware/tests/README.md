@@ -1,6 +1,6 @@
-# CPU tests
+# TinyMOA RTL Test Suite
 
-cocotb unit tests for cpu modules. runs against verilator using transpiled SV in `target/`.
+cocotb unit tests for CPU/LPU/NoC/etc. modules. runs against verilator using transpiled SV in `hardware/target/`.
 
 ## run
 

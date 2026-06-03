@@ -1,9 +1,10 @@
 [project]
 name = "tinymoa"
 version = "0.1.0"
+
 [build]
-sources = ["src"]
-target = {type = "directory", path = "target"}
+sources = ["hardware/rtl"]
+target = {type = "directory", path = "hardware/target"}
 # sourcemap_target = {type = "directory", path = "[dst dir]"}
 sourcemap_target = {type = "none"}
 incremental = false # only re-compile outdated files

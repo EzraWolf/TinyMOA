@@ -1,0 +1,58 @@
+// RV64IC decoder
+// soon RV64IMAFC_Zicsr_Zifencei_BF16
+
+pub module cpu_decoder (
+    i_instr: input logic<64>,
+
+    o_imm   : output logic<64>,
+    o_alu_op: output logic<4> ,
+) {
+    let quadrant = i_instr[1:0];
+    let opcode   = i_instr[6:2];
+
+    always_comb {
+        case (quadrant) {
+            2'b00: {}
+
+            2'b01: {}
+
+            2'b10: {}
+
+            // full 64-bit
+            2'b11: {
+                case (opcode) {
+
+                    // R-Type, ALU
+                    5'b01100: {}
+
+                    // I-Type, ALU imm
+                    5'b00100: {}
+
+                    // I-Type, load
+                    5'b00000: {}
+
+                    // I-Type, JALR
+                    5'b11001: {}
+
+                    // S-Type, store
+                    5'b01000: {}
+
+                    // B-Type, branch
+                    5'b11000: {}
+
+                    // U-Type, AUIPC
+                    5'b01101: {}
+
+                    // J-Type, JAL
+                    5'b11011: {}
+
+                    // SYSTEM
+                    5'b11100: {}
+
+                    // FENCE
+                    5'b00011: {}
+                }
+            }
+        }
+    }
+}

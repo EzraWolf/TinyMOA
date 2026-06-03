@@ -24,6 +24,5 @@ dev = [
 members = [
     "sandbox/cpu",
     "sandbox/lpu",
-    "test",
-    "src/cpu/tests",
+    "hardware/tests",
 ]
