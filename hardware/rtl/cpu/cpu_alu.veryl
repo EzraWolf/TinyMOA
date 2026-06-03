@@ -1,34 +1,11 @@
 // I64 ALU
 
-// RV64I base ALU ops
-pub package pkg_cpu_alu {
-    enum AluOp: logic<4> {
-
-        ADD = 4'b0000, // ADDI
-        ADDW = 4'b0001, // ADDIW
-        SUB = 4'b0010, // SUBI
-        SUBW = 4'b0011, // SUBIW
-
-        OR = 4'b0100, // ORI
-        AND = 4'b0101, // ANDI
-        XOR = 4'b0110, // XORI
-
-        SLT = 4'b0111, // SLTI
-        SLTU = 4'b1000, // SLTIU
-
-        SLL = 4'b1001, // SLLI
-        SLLW = 4'b1010, // SLLIW
-        SRL = 4'b1011, // SRLI
-        SRLW = 4'b1100, // SRLIW
-        SRA = 4'b1101, // SRAI
-        SRAW = 4'b1110, // SRAIW
-    }
-}
-
 pub module cpu_alu (
-    i_op : input  AluOp    ,
-    i_a  : input  logic<64>,
-    i_b  : input  logic<64>,
+    i_op: input pkg_cpu_alu::AluOp,
+
+    i_a: input logic<64>,
+    i_b: input logic<64>,
+
     o_res: output logic<64>,
 ) {
     import pkg_cpu_alu::AluOp;
@@ -73,9 +50,11 @@ pub module cpu_alu (
 }
 
 pub module dut_cpu_alu (
-    i_op : input  AluOp    ,
-    i_a  : input  logic<64>,
-    i_b  : input  logic<64>,
+    i_op: input pkg_cpu_alu::AluOp,
+
+    i_a: input logic<64>,
+    i_b: input logic<64>,
+
     o_res: output logic<64>,
 ) {
     import pkg_cpu_alu::AluOp;
@@ -85,5 +64,5 @@ pub module dut_cpu_alu (
         $dumpvars(0, dut_cpu_alu);
     }
 
-    inst dut_cpu_alu: cpu_alu ( i_op: i_op, i_a: i_a, i_b: i_b, o_res: o_res );
+    inst dut_cpu_alu: cpu_alu ( i_op, i_a, i_b, o_res );
 }

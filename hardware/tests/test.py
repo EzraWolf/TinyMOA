@@ -9,7 +9,7 @@ from pathlib import Path
 from cocotb_test import simulator
 
 
-def run_test(block_name: str, module_name: str, test_type: str):
+def run_test(block_name: str, module_name: str, test_type: str, pkgs: list = []):
     PROJECT_PATH = Path(__file__).parents[2].resolve()
 
     with open(PROJECT_PATH / "Veryl.toml") as f:
@@ -32,19 +32,22 @@ def run_test(block_name: str, module_name: str, test_type: str):
     # `veryl build` creates `cpu_alu.sv` and thus
     # `dut_cpu_alu` transpiles to `tinymoa_cpu_dut_alu`
     toplevel = f"{config['project']['name']}_dut_{module_name}"
-    sources = [str(TARGET_PATH / block_name / f"{module_name}.sv")]
     module = f"{test_type}.{block_name}.test_{module_name}"
+
+    sources = [str(TARGET_PATH / block_name / f"{module_name}.sv")]
+    for pkg in pkgs:
+        sources.append(str(TARGET_PATH / block_name / "pkgs" / f"{pkg}.sv"))
 
     simulator.run(
         toplevel=toplevel,
-        verilog_sources=sources,
         module=module,
         simulator=config["test"]["simulator"],
+        verilog_sources=sources,
     )
 
 
 def test_cpu_alu():
-    run_test("cpu", "cpu_alu", "unit")
+    run_test("cpu", "cpu_alu", "unit", pkgs=["pkg_cpu_alu"])
 
 
 if __name__ == "__main__":

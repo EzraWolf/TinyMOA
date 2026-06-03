@@ -1,0 +1,27 @@
+
+// RV64I base ALU ops
+// all instructions here can double as appropriate immediate ops
+// e.g., "ADD" works the same as "ADDI"
+pub package pkg_cpu_alu {
+    enum AluOp: logic<4> {
+
+        ADD = 4'b0000,
+        ADDW = 4'b0001,
+        SUB = 4'b0010,
+        SUBW = 4'b0011,
+
+        OR = 4'b0100,
+        AND = 4'b0101,
+        XOR = 4'b0110,
+
+        SLT = 4'b0111,
+        SLTU = 4'b1000,
+
+        SLL = 4'b1001,
+        SLLW = 4'b1010,
+        SRL = 4'b1011,
+        SRLW = 4'b1100,
+        SRA = 4'b1101,
+        SRAW = 4'b1110,
+    }
+}
