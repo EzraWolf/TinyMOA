@@ -32,6 +32,10 @@ results.xml
 *.fst.hier
 *.vcd
 *.ghw
+.build/
+build/
+dependencies/
+target/
 
 # Coverage
 .coverage
