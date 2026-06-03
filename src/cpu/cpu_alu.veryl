@@ -1,7 +1,7 @@
 // I64 ALU
 
 // RV64I base ALU ops
-pub package cpu_pkg_alu {
+pub package pkg_cpu_alu {
     enum AluOp: logic<4> {
 
         ADD = 4'b0000, // ADDI
@@ -29,9 +29,9 @@ pub module cpu_alu (
     i_op : input  AluOp    ,
     i_a  : input  logic<64>,
     i_b  : input  logic<64>,
-    o_out: output logic<64>,
+    o_res: output logic<64>,
 ) {
-    import cpu_pkg_alu::AluOp;
+    import pkg_cpu_alu::AluOp;
 
     var result : logic<64>;
     let shamt  : logic<6>  = i_b[5:0];
@@ -69,5 +69,21 @@ pub module cpu_alu (
             default    : result = 64'b0;
         }
     }
-    assign o_out = result;
+    assign o_res = result;
+}
+
+pub module dut_cpu_alu (
+    i_op : input  AluOp    ,
+    i_a  : input  logic<64>,
+    i_b  : input  logic<64>,
+    o_res: output logic<64>,
+) {
+    import pkg_cpu_alu::AluOp;
+
+    initial {
+        $dumpfile("dut_cpu_alu.fst");
+        $dumpvars(0, dut_cpu_alu);
+    }
+
+    inst dut_cpu_alu: cpu_alu ( i_op: i_op, i_a: i_a, i_b: i_b, o_res: o_res );
 }
