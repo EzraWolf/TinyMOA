@@ -17,6 +17,7 @@ def run_test(
     params: dict = {},
 ):
     PROJECT_PATH = Path(__file__).parents[2].resolve()
+    SIM_BUILD_PATH = Path(__file__).resolve().parent / "sim_build"
 
     with open(PROJECT_PATH / "Veryl.toml") as f:
         config = toml.load(f)
@@ -49,6 +50,7 @@ def run_test(
         module=module,
         # simulator=config["test"]["simulator"],
         simulator="verilator",
+        sim_build=str(SIM_BUILD_PATH / module_name),
         verilog_sources=sources,
         parameters=params,
     )
@@ -64,4 +66,4 @@ def test_mem_fifo(params):
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    pytest.main([__file__, "-v", "-j $(nproc)", ""])
