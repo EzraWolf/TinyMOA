@@ -58,7 +58,10 @@ pub module dut_cpu_alu (
 
     o_res: output logic<64>,
 ) {
-
+    initial {
+        $dumpfile("dut_cpu_alu.fst");
+        $dumpvars(0, dut_cpu_alu);
+    }
 
     inst dut_cpu_alu: cpu_alu (i_op, i_a, i_b, o_res);
 }

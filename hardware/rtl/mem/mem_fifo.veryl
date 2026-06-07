@@ -81,7 +81,11 @@ pub module dut_mem_fifo #(
     o_data : output logic<WIDTH>,
     o_empty: output logic,
 ) {
-
+    initial {
+        $dumpfile("dut_mem_fifo.fst");
+        $dumpvars(0, dut_mem_fifo);
+    }
+    
     inst dut_mem_fifo: mem_fifo # (
         WIDTH, DEPTH
     ) (
