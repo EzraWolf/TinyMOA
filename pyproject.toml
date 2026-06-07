@@ -1,28 +1,22 @@
 [project]
 name = "TinyMOA"
 version = "0.1.0"
-description = "Inference accelerator for transformer models using compute-in-memory (CIM) cores."
+description = "LLM inference SoC"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "cocotb>=2.0.1",
-    "cocotb-test>=0.2.6",
-    "klayout>=0.30.7",
-    "matplotlib>=3.10.8",
-    "numpy>=2.4.2",
-    "pandas>=3.0.1",
-    "pytest>=9.0.2",
-    "ruff>=0.15.2",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
+    "cocotb>=2.0.1",
+    "cocotb-test>=0.2.6",
+    "pytest>=9.0.3",
     "ruff>=0.15.2",
 ]
 
 [tool.uv.workspace]
 members = [
-    "sandbox/cpu",
-    "sandbox/lpu",
+    "hardware/sandbox/cpu",
+    "hardware/sandbox/lpu",
     "hardware/tests",
 ]

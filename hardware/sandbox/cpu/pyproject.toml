@@ -1,10 +1,12 @@
 [project]
 name = "tinymoa-cpu-sandbox"
 version = "0.1.0"
-description = "Sandbox for the TinyMOA CPU"
+description = "TinyMOA CPU cycle-accurate model"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "numpy>=2.4.2",
-    "ruff>=0.15.2",
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.15",
 ]

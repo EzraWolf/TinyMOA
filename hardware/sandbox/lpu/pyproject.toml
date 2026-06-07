@@ -1,7 +1,12 @@
 [project]
 name = "tinymoa-lpu-sandbox"
 version = "0.1.0"
-description = "Sandbox for the TinyMOA LPU"
+description = "TinyMOA LPU cycle-accurate model"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.15",
+]
