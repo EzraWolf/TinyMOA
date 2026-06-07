@@ -1,17 +1,18 @@
-// I64 ALU
+import pkg_cpu_alu::*;
 
-pub module cpu_alu (
+pub module cpu_alu #(
+    param WIDTH: u32 = 64,
+) (
     i_op: input pkg_cpu_alu::AluOp,
 
-    i_a: input logic<64>,
-    i_b: input logic<64>,
+    i_a: input logic<WIDTH>,
+    i_b: input logic<WIDTH>,
 
-    o_res: output logic<64>,
+    o_res: output logic<WIDTH>,
 ) {
-    import pkg_cpu_alu::AluOp;
 
-    var result : logic<64>;
-    let shamt  : logic<6>  = i_b[5:0];
+    var result : logic<WIDTH>;
+    let shamt  : logic<6>  = i_b[$clog2(WIDTH)-1:0];
     let shamt32: logic<5>  = i_b[4:0];
 
     let i_a32: logic<32> = i_a[31:0];
@@ -57,12 +58,7 @@ pub module dut_cpu_alu (
 
     o_res: output logic<64>,
 ) {
-    import pkg_cpu_alu::AluOp;
 
-    initial {
-        $dumpfile("dut_cpu_alu.fst");
-        $dumpvars(0, dut_cpu_alu);
-    }
 
-    inst dut_cpu_alu: cpu_alu ( i_op, i_a, i_b, o_res );
+    inst dut_cpu_alu: cpu_alu (i_op, i_a, i_b, o_res);
 }

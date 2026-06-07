@@ -3,10 +3,10 @@ import random
 from cocotb.triggers import Timer
 
 
-async def _alu(dut, op, a, b):
-    dut.i_op.value = op
-    dut.i_a.value = a
-    dut.i_b.value = b
+async def _alu(dut, i_op, i_a, i_b):
+    dut.i_op.value = i_op
+    dut.i_a.value = i_a
+    dut.i_b.value = i_b
     await Timer(1, "ns")
     return int(dut.o_res.value)
 
