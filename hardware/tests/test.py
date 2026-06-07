@@ -9,7 +9,13 @@ from pathlib import Path
 from cocotb_test import simulator
 
 
-def run_test(block_name: str, module_name: str, test_type: str, pkgs: list = []):
+def run_test(
+    block_name: str,
+    module_name: str,
+    test_type: str,
+    pkgs: list = [],
+    params: dict = {},
+):
     PROJECT_PATH = Path(__file__).parents[2].resolve()
 
     with open(PROJECT_PATH / "Veryl.toml") as f:
@@ -41,8 +47,10 @@ def run_test(block_name: str, module_name: str, test_type: str, pkgs: list = [])
     simulator.run(
         toplevel=toplevel,
         module=module,
-        simulator=config["test"]["simulator"],
+        # simulator=config["test"]["simulator"],
+        simulator="verilator",
         verilog_sources=sources,
+        parameters=params,
     )
 
 
@@ -50,6 +58,10 @@ def test_cpu_alu():
     run_test("cpu", "cpu_alu", "unit", pkgs=["pkg_cpu_alu"])
 
 
+@pytest.mark.parametrize("params", [{"WIDTH": 64, "DEPTH": 4}])
+def test_mem_fifo(params):
+    run_test("mem", "mem_fifo", "unit", params=params)
+
+
 if __name__ == "__main__":
-    # run_test2("cpu_alu")
-    pytest.main([__file__])
+    pytest.main([__file__, "-v"])
