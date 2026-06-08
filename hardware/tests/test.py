@@ -4,6 +4,7 @@ Run with `pytest test.py` or `uv run pytest test.py`
 """
 
 import os
+import sys
 import glob
 import toml
 import pytest
@@ -84,6 +85,7 @@ if __name__ == "__main__":
     pytest.main(
         [
             __file__,
+            *sys.argv[1:],
             "-q",
             "--no-header",
             "--tb=line",
