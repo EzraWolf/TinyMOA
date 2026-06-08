@@ -78,3 +78,36 @@ async def subw_basic(dut):
             expected |= sign_ext
         actual = await _alu(dut, AluOp.SUBW, a, b)
         assert expected == actual
+
+
+@cocotb.test()
+async def or_basic(dut):
+    max_size = 0xFFFF_FFFF_FFFF_FFFF
+    for _ in range(20):
+        a = random.randint(0, max_size)
+        b = random.randint(0, max_size)
+        expected = a | b
+        actual = await _alu(dut, AluOp.OR, a, b)
+        assert expected == actual
+
+
+@cocotb.test()
+async def and_basic(dut):
+    max_size = 0xFFFF_FFFF_FFFF_FFFF
+    for _ in range(20):
+        a = random.randint(0, max_size)
+        b = random.randint(0, max_size)
+        expected = a & b
+        actual = await _alu(dut, AluOp.AND, a, b)
+        assert expected == actual
+
+
+@cocotb.test()
+async def xor_basic(dut):
+    max_size = 0xFFFF_FFFF_FFFF_FFFF
+    for _ in range(20):
+        a = random.randint(0, max_size)
+        b = random.randint(0, max_size)
+        expected = a ^ b
+        actual = await _alu(dut, AluOp.XOR, a, b)
+        assert expected == actual
