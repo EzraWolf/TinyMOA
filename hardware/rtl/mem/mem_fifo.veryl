@@ -51,10 +51,10 @@ pub module mem_fifo #(
         if_reset {
             is_read = 1'b1;
         } else {
-            if i_wen && !o_full {
-                is_read = 1'b0;
-            } else if i_ren && !o_empty{
+            if i_ren && !o_empty {
                 is_read = 1'b1;
+            } else if i_wen && !o_full {
+                is_read = 1'b0;
             } else {
                 is_read = is_read;
             }
