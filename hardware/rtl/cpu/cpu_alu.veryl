@@ -27,19 +27,19 @@ pub module cpu_alu #(
     always_comb {
         case (i_op) {
             AluOp::ADD : result = i_a + i_b;
-            AluOp::ADDW: result = {add32[31] repeat 32, add32};
+            AluOp::ADDW: result = {add32[msb] repeat 32, add32};
             AluOp::SUB : result = i_a - i_b;
-            AluOp::SUBW: result = {sub32[31] repeat 32, sub32};
+            AluOp::SUBW: result = {sub32[msb] repeat 32, sub32};
             AluOp::OR  : result = i_a | i_b;
             AluOp::AND : result = i_a & i_b;
             AluOp::XOR : result = i_a ^ i_b;
 
             AluOp::SLL : result = i_a << shamt;
-            AluOp::SLLW: result = {sll32[31] repeat 32, sll32};
+            AluOp::SLLW: result = {sll32[msb] repeat 32, sll32};
             AluOp::SRL : result = i_a >> shamt;
-            AluOp::SRLW: result = {srl32[31] repeat 32, srl32};
+            AluOp::SRLW: result = {srl32[msb] repeat 32, srl32};
             AluOp::SRA : result = $signed(i_a) >>> shamt;
-            AluOp::SRAW: result = {sra32[31] repeat 32, sra32};
+            AluOp::SRAW: result = {sra32[msb] repeat 32, sra32};
 
             AluOp::SLT : result = {63'b0, $signed(i_a) <: $signed(i_b)};
             AluOp::SLTU: result = {63'b0, i_a <: i_b};
