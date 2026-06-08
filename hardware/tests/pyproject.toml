@@ -1,7 +1,7 @@
 [project]
-name = "TinyMOA"
+name = "tinymoa-rtl-tests"
 version = "0.1.0"
-description = "LLM inference SoC"
+description = "TinyMOA RTL test suite"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
@@ -11,12 +11,6 @@ dev = [
     "cocotb>=2.0.1",
     "cocotb-test>=0.2.6",
     "pytest>=9.0.3",
-    "ruff>=0.15.2",
-]
-
-[tool.uv.workspace]
-members = [
-    "hardware/sandbox/cpu",
-    "hardware/sandbox/lpu",
-    "hardware/tests",
+    "ruff>=0.15.15",
+    "toml>=0.10.2",
 ]

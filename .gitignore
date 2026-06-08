@@ -33,6 +33,14 @@ results.xml
 *.vcd
 *.ghw
 
+# Veryl
+.build/
+build/
+dependencies/
+target/
+*.f
+*.sv.map
+
 # Coverage
 .coverage
 htmlcov/

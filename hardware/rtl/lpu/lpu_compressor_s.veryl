@@ -1,0 +1,45 @@
+// Single-approximate compressor
+// Moderate area savings by avoiding adder-trees, low accuracy loss
+//
+// AND gates underestimate, OR gates overestimate
+//
+// Reference: ISSCC 2022, Wang et al.
+//    "DIMC: 2219TOPS/W 2569F2/b Digital In-Memory Computing Macro
+//     in 28nm Based on Approximate Arithmetic Hardware"
+
+pub module lpu_compressor_s::<IN_WIDTH: u16 = 64> (
+    i_data: input  logic<IN_WIDTH>    ,
+    o_data: output logic<IN_WIDTH / 2>,
+) {
+    gen LAYER_CT : u16 = IN_WIDTH / 2;
+    gen OUT_WIDTH: u16 = IN_WIDTH / 2;
+
+    // Stage 1 approximate compression
+    var comp_layer: logic<IN_WIDTH> [LAYER_CT];
+
+    // Layer  A   Op  B
+    // ----------------
+    // 0      0   &   1
+    // 1      2   |   3
+    // 2      4   &   5
+    // ...
+    // N      N*2  even=and; odd=or  (2*N)+1
+    for l in 0..LAYER_CT :gen_compressor_s {
+        if (l % 2) == 0 :gen_compressor_s_is_bitwise_and {
+            assign comp_layer[l] = i_data[2 * l] & i_data[(2 * l) + 1];
+        } else {
+            assign comp_layer[l] = i_data[2 * l] | i_data[(2 * l) + 1];
+        }
+    }
+
+    // Stage 2 exact compression (summnation)
+    var result: logic<OUT_WIDTH>;
+    for layer in 0..LAYER_CT :gen_compressor_s_result {
+
+        // Different from "a += b", which is sequential
+        // We *generate* the combinational "result = a + b + c + ..."
+        assign result = result + comp_layer[layer];
+    }
+
+    assign o_data = result;
+}

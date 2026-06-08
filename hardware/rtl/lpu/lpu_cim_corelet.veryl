@@ -1,0 +1,70 @@
+// Stateless NxN DCIM crossbar array (one corelet)
+// Chained together via shift registers (?)
+// Critical for `Q @ (K @ V^T)` matmul operations
+//
+// Encoding: 0 = -1, 1 = +1 (bipolar)
+//   XNOR(a, b) = a * b under this encoding
+//   Approximate-compressor errors cancel because (+1) - (-1) avg = 0
+//
+// Weight loading transposes row-major input into column registers when `wen` pulses
+//      weights[col][row_cnt] <= data_in[col]
+//
+// Cycle modes (mutually exclusive, priority top -> bottom):
+//   wen       : load one row of all column weights, advance row_cnt
+//   acc_clear : zero all shift-accumulators
+//   else      : bit-serial MAC -- shift_acc <<= 1; shift_acc += popcount
+//
+// Key reference: ISSCC 2022, Wang et al.
+//      "DIMC: 2219TOPS/W 2569F2/b Digital In-Memory Computing Macro
+//      in 28nm Based on Approximate Arithmetic Hardware"
+//
+// TODO: Update SRAM-based CIM cells in KLayout for highly regular floorplanning
+
+pub module lpu_corelet::<IN_WIDTH: u16 = 32, ACT_BITS: u16 = 6> (
+    clk: input clock,
+    rst: input reset,
+
+    wen: input logic,
+
+    col_sel: input logic<$clog2(IN_WIDTH)>,
+    data_in: input logic<IN_WIDTH>        ,
+
+    result: output logic<IN_WIDTH / 2 + ACT_BITS>,
+) {
+    gen POP_WIDTH: u16 = IN_WIDTH / 2;
+    gen OUT_WIDTH: u16 = POP_WIDTH + ACT_BITS;
+
+    var weights  : logic<IN_WIDTH>         [IN_WIDTH];
+    var shift_acc: logic<OUT_WIDTH>        [IN_WIDTH];
+    var row_cnt  : logic<$clog2(IN_WIDTH)>           ;
+
+    var popcount: logic<POP_WIDTH> [IN_WIDTH];
+
+    for column in 0..IN_WIDTH :gen_matmul_crossbar {
+        let xnor: logic<IN_WIDTH> = ~(weights[column] ^ data_in);
+        inst u_comp: lpu_compressor_s::<IN_WIDTH> ( i_data: xnor, o_data: popcount[column] );
+    }
+
+    always_ff (clk, rst) {
+        if_reset {
+            row_cnt = 0;
+            for i in 0..IN_WIDTH {
+                weights[i]   = 0;
+                shift_acc[i] = 0;
+            }
+        } else {
+            if wen {
+                for i in 0..IN_WIDTH {
+                    weights[i][row_cnt] = data_in[i];
+                }
+                row_cnt = row_cnt + 1;
+            } else {
+                for i in 0..IN_WIDTH {
+                    shift_acc[i] = (shift_acc[i] << 1) + popcount[i];
+                }
+            }
+        }
+    }
+
+    assign result = shift_acc[col_sel];
+}
