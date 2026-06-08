@@ -3,6 +3,9 @@ import random
 from enum import Enum
 from cocotb.triggers import Timer
 
+X32_MASK = 0xFFFF_FFFF
+X64_MASK = 0xFFFF_FFFF_FFFF_FFFF
+
 
 class AluOp(Enum):
     ADD = 0b0000
@@ -30,84 +33,61 @@ async def _alu(dut, i_op: AluOp, i_a, i_b):
     return int(dut.o_res.value)
 
 
+def _sext32(x: int):
+    return x | 0xFFFF_FFFF_0000_0000 if x >> 31 else x
+
+
 @cocotb.test()
 async def add_basic(dut):
-    max_size = 0xFFFF_FFFF_FFFF_FFFF
     for _ in range(20):
-        a = random.randint(0, max_size)
-        b = random.randint(0, max_size)
-        expected = (a + b) & max_size
-        actual = await _alu(dut, AluOp.ADD, a, b)
-        assert expected == actual
+        a = random.randint(0, X64_MASK)
+        b = random.randint(0, X64_MASK)
+        assert (a + b) & X64_MASK == await _alu(dut, AluOp.ADD, a, b)
 
 
 @cocotb.test()
 async def addw_basic(dut):
-    max_size = 0xFFFF_FFFF
-    sign_ext = 0xFFFF_FFFF_0000_0000
     for _ in range(20):
-        a = random.randint(0, max_size)
-        b = random.randint(0, max_size)
-        expected = (a + b) & max_size
-        if expected >> 31:
-            expected |= sign_ext
-        actual = await _alu(dut, AluOp.ADDW, a, b)
-        assert expected == actual
+        a = random.randint(0, X32_MASK)
+        b = random.randint(0, X32_MASK)
+        assert _sext32((a + b) & X32_MASK) == await _alu(dut, AluOp.ADDW, a, b)
 
 
 @cocotb.test()
 async def sub_basic(dut):
-    max_size = 0xFFFF_FFFF_FFFF_FFFF
     for _ in range(20):
-        a = random.randint(0, max_size)
-        b = random.randint(0, max_size)
-        expected = (a - b) & max_size
-        actual = await _alu(dut, AluOp.SUB, a, b)
-        assert expected == actual
+        a = random.randint(0, X64_MASK)
+        b = random.randint(0, X64_MASK)
+        assert (a - b) & X64_MASK == await _alu(dut, AluOp.SUB, a, b)
 
 
 @cocotb.test()
 async def subw_basic(dut):
-    max_size = 0xFFFF_FFFF
-    sign_ext = 0xFFFF_FFFF_0000_0000
     for _ in range(20):
-        a = random.randint(0, max_size)
-        b = random.randint(0, max_size)
-        expected = (a - b) & max_size
-        if expected >> 31:
-            expected |= sign_ext
-        actual = await _alu(dut, AluOp.SUBW, a, b)
-        assert expected == actual
+        a = random.randint(0, X32_MASK)
+        b = random.randint(0, X32_MASK)
+        assert _sext32((a - b) & X32_MASK) == await _alu(dut, AluOp.SUBW, a, b)
 
 
 @cocotb.test()
 async def or_basic(dut):
-    max_size = 0xFFFF_FFFF_FFFF_FFFF
     for _ in range(20):
-        a = random.randint(0, max_size)
-        b = random.randint(0, max_size)
-        expected = a | b
-        actual = await _alu(dut, AluOp.OR, a, b)
-        assert expected == actual
+        a = random.randint(0, X64_MASK)
+        b = random.randint(0, X64_MASK)
+        assert (a | b) == await _alu(dut, AluOp.OR, a, b)
 
 
 @cocotb.test()
 async def and_basic(dut):
-    max_size = 0xFFFF_FFFF_FFFF_FFFF
     for _ in range(20):
-        a = random.randint(0, max_size)
-        b = random.randint(0, max_size)
-        expected = a & b
-        actual = await _alu(dut, AluOp.AND, a, b)
-        assert expected == actual
+        a = random.randint(0, X64_MASK)
+        b = random.randint(0, X64_MASK)
+        assert (a & b) == await _alu(dut, AluOp.AND, a, b)
 
 
 @cocotb.test()
 async def xor_basic(dut):
-    max_size = 0xFFFF_FFFF_FFFF_FFFF
     for _ in range(20):
-        a = random.randint(0, max_size)
-        b = random.randint(0, max_size)
-        expected = a ^ b
-        actual = await _alu(dut, AluOp.XOR, a, b)
-        assert expected == actual
+        a = random.randint(0, X64_MASK)
+        b = random.randint(0, X64_MASK)
+        assert (a ^ b) == await _alu(dut, AluOp.XOR, a, b)
