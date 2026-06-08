@@ -180,6 +180,9 @@ source = { virtual = "hardware/sandbox/cpu" }
 
 [package.dev-dependencies]
 dev = [
+    { name = "cocotb" },
+    { name = "cocotb-test" },
+    { name = "pytest" },
     { name = "ruff" },
 ]
 
