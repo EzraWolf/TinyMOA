@@ -3,10 +3,33 @@ CPU tests using pytest + cocotb
 Run with `pytest test.py` or `uv run pytest test.py`
 """
 
+import os
+import glob
 import toml
 import pytest
 from pathlib import Path
-from cocotb_test import simulator
+from xml.etree import cElementTree as ET
+from cocotb_test.simulator import Verilator
+
+
+def _extract_failure_trace(sim_build_dir: str) -> list[str]:
+    """
+    because cocotb-test hasn't pytest trace
+    and pytest capture log is rancid.
+    """
+    results = glob.glob(f"{sim_build_dir}/*_results.xml")
+
+    tree = ET.parse(max(results, key=os.path.getmtime))
+
+    failures = []
+    for tc in tree.iter("testcase"):
+        for f in tc.iter("failure"):
+            name = tc.get("name")
+            # line = tc.get("lineno") # only returns the "@cocotb.test()" line
+            desc = f.get("error_msg")
+            file = os.path.basename(tc.get("file", "???"))
+            failures.append(f"{name} ({file})\n{desc}\n\b")
+    return failures
 
 
 def run_test(
@@ -16,44 +39,34 @@ def run_test(
     pkgs: list = [],
     params: dict = {},
 ):
-    PROJECT_PATH = Path(__file__).parents[2].resolve()
-    SIM_BUILD_PATH = Path(__file__).resolve().parent / "sim_build"
+    PRJ_DIR = Path(__file__).parents[2].resolve()
+    SIM_DIR = Path(__file__).resolve().parent / "sim_build" / module_name
 
-    with open(PROJECT_PATH / "Veryl.toml") as f:
+    with open(PRJ_DIR / "Veryl.toml") as f:
         config = toml.load(f)
 
-    # dynamically fetch transpiled SV path
     # Veryl `bundle` and `source` build targets not supported
-    TARGET_PATH = None
-    if config["build"]["target"]["type"] == "directory":
-        TARGET_PATH = PROJECT_PATH / config["build"]["target"]["path"]
+    assert config["build"]["target"]["type"] == "directory"
+    SRC_DIR = PRJ_DIR / config["build"]["target"]["path"]
+    assert SRC_DIR
 
-    # if config["build"]["target"]["type"] == "source":
-    #    TARGET_PATH = PROJECT_PATH / config["build"]["sources"][0]
+    sources = [str(SRC_DIR / block_name / f"{module_name}.sv")]
+    sources += [str(SRC_DIR / block_name / "pkgs" / f"{p}.sv") for p in pkgs]
 
-    assert TARGET_PATH
+    failures = []
+    try:
+        Verilator(
+            toplevel=f"{config['project']['name']}_dut_{module_name}",
+            module=f"{test_type}.{block_name}.test_{module_name}",
+            sim_build=str(SIM_DIR),
+            verilog_sources=sources,
+            parameters=params,
+        ).run()
+    except SystemExit:
+        failures = _extract_failure_trace(str(SIM_DIR))
 
-    # Veryl file     `cpu_alu.veryl` must have
-    # Veryl modules  `cpu_alu and `dut_cpu_alu`
-    #
-    # `veryl build` creates `cpu_alu.sv` and thus
-    # `dut_cpu_alu` transpiles to `tinymoa_cpu_dut_alu`
-    toplevel = f"{config['project']['name']}_dut_{module_name}"
-    module = f"{test_type}.{block_name}.test_{module_name}"
-
-    sources = [str(TARGET_PATH / block_name / f"{module_name}.sv")]
-    for pkg in pkgs:
-        sources.append(str(TARGET_PATH / block_name / "pkgs" / f"{pkg}.sv"))
-
-    simulator.run(
-        toplevel=toplevel,
-        module=module,
-        # simulator=config["test"]["simulator"],
-        simulator="verilator",
-        sim_build=str(SIM_BUILD_PATH / module_name),
-        verilog_sources=sources,
-        parameters=params,
-    )
+    for failure in failures:
+        pytest.fail(failure)
 
 
 def test_cpu_alu():
@@ -66,4 +79,17 @@ def test_mem_fifo(params):
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-j $(nproc)", ""])
+    # show terse error trace in summary (same info as `-v --tb=short`, just shorter)
+    # works by using `pytest.fail()` in `run_test()`
+    pytest.main(
+        [
+            __file__,
+            "-q",
+            "--no-header",
+            "--tb=line",
+            "--show-capture=no",
+            "-rfE",
+            "-W",
+            "ignore::pytest.PytestAssertRewriteWarning",
+        ]
+    )
