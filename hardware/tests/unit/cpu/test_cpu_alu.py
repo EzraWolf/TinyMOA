@@ -20,3 +20,14 @@ async def add_basic(dut):
         expected = (a + b) & max_size
         actual = await _alu(dut, 0b0000, a, b) & max_size
         assert expected == actual
+
+
+@cocotb.test()
+async def sub_basic(dut):
+    max_size = 0xFFFF_FFFF_FFFF_FFFF
+    for _ in range(20):
+        a = random.randint(0, max_size)
+        b = random.randint(0, max_size)
+        expected = (a - b) & max_size
+        actual = await _alu(dut, 0b0010, a, b)
+        assert expected == actual
