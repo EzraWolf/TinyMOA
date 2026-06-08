@@ -1,32 +1,37 @@
 # TinyMOA
 
-LLM inference should be transparent and not require a datacenter. TinyMOA is an inference accelerator for transformer models using compute-in-memory (CIM) cores.
+open-source LLM inference SoC with custom Language Processing Unit (LPU).
 
-## Quickstart
+target metrics
+- \>30 tok/s, 32K window LLaMA 3.2 8B Q4
+- \>100 TOPS/W @ INT/FP8 (~12x NVIDIA H100 SXM @ 8.4 TOPS/W)
 
-Insallation
+target specs
+- OoO RISC-V CPU (`RV32I` or `RV64I`)
+- 4MB CIM, 8GB GDDR6
+- baseline CPU ISA `RV32I` or `RV64I`
+- optional CPU ISA `MAFDCZbb_Zcb_Zicsr_Zifencei_Zicond_Zfbfmin`
+- BMX8 (block-mixed-FP8: E4M3, block=32)
 
-```python
-example program
+## project structure
+
+WIP
+
+## quickstart
+
+FPGA/ASIC targets not ready. public release must use verilator.
+
+```bash
+veryl build
+
+# run all tests
+cd hardware/tests
+uv run test.py
+
+# run specific test
+uv run test.py -k test_cpu_alu
 ```
 
-## Architecture
+## acknowledgements
 
-### ISA
-
-| Extension    | Notes |
-|--------------|-------|
-| RV32I (base) | Fully implemented |
-| E (embedded) | 16 registers instead of 32 (x0–x15) |
-| C (compresseD) / Zca | Full Q0, Q1, Q2 |
-| Zcb    | Byte ops + C.MUL (16x16 -> 32-bit) |
-| Zicond | Full: `czero.eqz`, `czero.nez` |
-| Zicsr  | Not implemented |
-| M (multiply) | Not implemented - opcodes reserved, C.MUL covers the common case |
-| F (float) | Not implemented - opcodes reserved |
-
-### CPU Core
-
-RV32EC, nibble-serial, 6-state pipeline:
-
-### DCIM Accelerator
+BMX8 is named after SplineDrive who made the KianV linux SoC, a key inspiration for TinyMOA. he rides BMX.
