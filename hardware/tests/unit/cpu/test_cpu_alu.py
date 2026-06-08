@@ -17,5 +17,6 @@ async def add_basic(dut):
     for _ in range(20):
         a = random.randint(0, max_size)
         b = random.randint(0, max_size)
-        r = await _alu(dut, 0b0000, a, b)
-        assert r == (a + b) & max_size, f"{hex(a)} + {hex(b)}: got {hex(r)}"
+        expected = (a + b) & max_size
+        actual = await _alu(dut, 0b0000, a, b) & max_size
+        assert expected == actual
