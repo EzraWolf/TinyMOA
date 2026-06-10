@@ -16,7 +16,7 @@ pub module mem_fifo #(
     o_empty: output logic,
 ) {
     var is_read: logic;
-    
+
     var w_ptr  : logic<$clog2(DEPTH)>;
     var r_ptr  : logic<$clog2(DEPTH)>;
     var buffer : logic<WIDTH>[DEPTH];
