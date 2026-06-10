@@ -2,7 +2,7 @@
 <picture>
     <!-- tinygrad README <3, but i've already been using the "tiny" prefix -->
     <source media="(prefers-color-scheme: light)" srcset="assets/logo.svg">
-    <img alt="TinyMOA logo" src="assets/logo.svg" width="50%" height="50%">
+    <img alt="TinyMOA logo" src="docs/logo.svg" width="50%" height="50%">
 </picture>
 
 LLMs are cool but the compute itself is closed-source
