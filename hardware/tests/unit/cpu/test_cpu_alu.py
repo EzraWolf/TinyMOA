@@ -148,6 +148,7 @@ async def sltu_basic(dut):
         {"WIDTH": 8},
         {"WIDTH": 32},
         {"WIDTH": 64},
+        {"WIDTH": 128},
     ],
 )
 def test_cpu_alu(p):
