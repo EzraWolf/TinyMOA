@@ -1,8 +1,8 @@
 <div align="center">
 <picture>
     <!-- tinygrad README <3, but i've already been using the "tiny" prefix -->
-  <source media="(prefers-color-scheme: dark)" srcset="docs/logo_light.svg">
-  <img alt="a" src="docs/logo_dark.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo_dark.svg">
+  <img alt="a" src="docs/logo_light.svg">
 </picture>
 
 LLMs are cool but the compute itself is closed-source
