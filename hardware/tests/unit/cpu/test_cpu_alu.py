@@ -122,6 +122,26 @@ async def xor_basic(dut):
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
+@cocotb.test()
+async def slt_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
+        exp = 1 if _sext(a, WIDTH) < _sext(b, WIDTH) else 0
+        res = await _alu(dut, AluOp.SLT, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def sltu_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
+        exp = 1 if a < b else 0
+        res = await _alu(dut, AluOp.SLTU, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
 @pytest.mark.parametrize(
     "p",
     [
