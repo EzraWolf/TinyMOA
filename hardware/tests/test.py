@@ -14,13 +14,15 @@ from cocotb_test.simulator import Verilator
 
 
 def _extract_failure_trace(sim_build_dir: str) -> list[str]:
-    """
-    because cocotb-test hasn't pytest trace
-    and pytest capture log is rancid.
-    """
+    """because pytest capture is ugly as sin"""
     results = glob.glob(f"{sim_build_dir}/*_results.xml")
+    if not results:
+        return ["no results.xml (compile failed)"]
 
-    tree = ET.parse(max(results, key=os.path.getmtime))
+    xml_files = [r for r in results if os.path.getsize(r) > 0]
+    if not xml_files:
+        return ["simulation didn't run (compile error?)"]
+    tree = ET.parse(max(xml_files, key=os.path.getmtime))
 
     failures = []
     for tc in tree.iter("testcase"):
@@ -41,7 +43,12 @@ def run_test(
     params: dict = {},
 ):
     PRJ_DIR = Path(__file__).parents[2].resolve()
-    SIM_DIR = Path(__file__).resolve().parent / "sim_build" / module_name
+    SIM_DIR = (
+        Path(__file__).resolve().parent
+        / "sim_build"
+        / module_name
+        / "_".join(("{}_{}".format(*i) for i in params.items()))
+    )
 
     with open(PRJ_DIR / "Veryl.toml") as f:
         config = toml.load(f)
@@ -54,6 +61,16 @@ def run_test(
     sources = [str(SRC_DIR / block_name / f"{module_name}.sv")]
     sources += [str(SRC_DIR / block_name / "pkgs" / f"{p}.sv") for p in pkgs]
 
+    """
+    simulator.run(
+        toplevel=f"{config['project']['name']}_dut_{module_name}",
+        module=f"{test_type}.{block_name}.test_{module_name}",
+        sim_build=str(SIM_DIR),
+        verilog_sources=sources,
+        parameters=params,
+    )
+
+    """
     failures = []
     try:
         Verilator(
@@ -70,11 +87,14 @@ def run_test(
         pytest.fail(failure)
 
 
-def test_cpu_alu():
-    run_test("cpu", "cpu_alu", "unit", pkgs=["pkg_cpu_alu"])
+@pytest.mark.parametrize("params", [{"WIDTH": "32"}, {"WIDTH": "64"}])
+def test_cpu_alu(params):
+    run_test("cpu", "cpu_alu", "unit", pkgs=["pkg_cpu_alu"], params=params)
 
 
-@pytest.mark.parametrize("params", [{"WIDTH": 64, "DEPTH": 4}])
+@pytest.mark.parametrize(
+    "params", [{"WIDTH": "64", "DEPTH": "8"}, {"WIDTH": "64", "DEPTH": "128"}]
+)
 def test_mem_fifo(params):
     run_test("mem", "mem_fifo", "unit", params=params)
 
@@ -88,9 +108,11 @@ if __name__ == "__main__":
             *sys.argv[1:],
             "-q",
             "--no-header",
-            "--tb=line",
-            "--show-capture=no",
+            "--tb=short",
+            # "--show-capture=no",
             "-rfE",
+            "-n",
+            "auto",
             "-W",
             "ignore::pytest.PytestAssertRewriteWarning",
         ]
