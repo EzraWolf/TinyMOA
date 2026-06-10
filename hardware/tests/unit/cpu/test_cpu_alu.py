@@ -247,7 +247,7 @@ async def sll_shift_out(dut):
 async def srl_fill_zero(dut):
     exp = XLEN_MASK >> SHAMT_MASK
     res = await _alu(dut, AluOp.SRL, XLEN_MASK, SHAMT_MASK)
-    assert res == exp, (f"expected {hex(exp)} got {hex(res)}")
+    assert res == exp, f"expected {hex(exp)} got {hex(res)}"
 
 
 @cocotb.test()
@@ -261,7 +261,7 @@ async def sra_fill_zero(dut):
     pos = XLEN_MASK >> 1
     exp = pos >> SHAMT_MASK
     res = await _alu(dut, AluOp.SRA, pos, SHAMT_MASK)
-    assert res == exp, (f"expected {hex(exp)} got {hex(res)}")
+    assert res == exp, f"expected {hex(exp)} got {hex(res)}"
 
 
 @cocotb.test(skip=(WIDTH < 64))

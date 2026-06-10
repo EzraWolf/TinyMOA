@@ -61,9 +61,6 @@ pub module cpu_alu #(
             }
         }
     }
-
-
-    
     assign o_res = result | w_result;
 }
 
