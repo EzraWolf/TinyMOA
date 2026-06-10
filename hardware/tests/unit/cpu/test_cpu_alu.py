@@ -8,7 +8,9 @@ from ...runner import run
 
 
 WIDTH = int(os.environ.get("WIDTH", 8))
-XLEN_MASK = 2**WIDTH - 1
+SHAMT_MASK = (1 << (WIDTH.bit_length() - 1)) - 1
+XLEN_MASK = (1 << WIDTH) - 1
+X32_MASK = 0xFFFF_FFFF
 
 
 class AluOp(Enum):
@@ -62,10 +64,9 @@ async def add_basic(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def addw_basic(dut):
-    X32_MASK = 0xFFFF_FFFF
     for _ in range(20):
-        a = random.randint(0, X32_MASK)
-        b = random.randint(0, X32_MASK)
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
         exp = _sext((a + b) & X32_MASK, 32) & XLEN_MASK
         res = await _alu(dut, AluOp.ADDW, a, b)
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
@@ -83,10 +84,9 @@ async def sub_basic(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def subw_basic(dut):
-    X32_MASK = 0xFFFF_FFFF
     for _ in range(20):
-        a = random.randint(0, X32_MASK)
-        b = random.randint(0, X32_MASK)
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
         exp = _sext((a - b) & X32_MASK, 32) & XLEN_MASK
         res = await _alu(dut, AluOp.SUBW, a, b)
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
@@ -139,6 +139,67 @@ async def sltu_basic(dut):
         b = random.randint(0, XLEN_MASK)
         exp = 1 if a < b else 0
         res = await _alu(dut, AluOp.SLTU, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def sll_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, SHAMT_MASK)
+        exp = (a << b) & XLEN_MASK
+        res = await _alu(dut, AluOp.SLL, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def srl_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, SHAMT_MASK)
+        exp = a >> b
+        res = await _alu(dut, AluOp.SRL, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def sra_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, SHAMT_MASK)
+        exp = (_sext(a, WIDTH) >> b) & XLEN_MASK
+        res = await _alu(dut, AluOp.SRA, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def sllw_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, X32_MASK)
+        b = random.randint(0, SHAMT_MASK)
+        exp = _sext((a << b) & X32_MASK, 32) & XLEN_MASK
+        res = await _alu(dut, AluOp.SLLW, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def srlw_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, X32_MASK)
+        b = random.randint(0, SHAMT_MASK)
+        exp = _sext(a >> b, 32) & XLEN_MASK
+        res = await _alu(dut, AluOp.SRLW, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def sraw_basic(dut):
+    for _ in range(20):
+        a = random.randint(0, X32_MASK)
+        b = random.randint(0, SHAMT_MASK)
+        sra32 = (_sext(a, 32) >> b) & X32_MASK
+        exp = _sext(sra32, 32) & XLEN_MASK
+        res = await _alu(dut, AluOp.SRAW, a, b)
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
