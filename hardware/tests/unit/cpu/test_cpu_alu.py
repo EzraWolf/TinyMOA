@@ -62,6 +62,20 @@ async def add_basic(dut):
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
+@cocotb.test()
+async def add_carry(dut):
+    exp = (XLEN_MASK + XLEN_MASK) & XLEN_MASK
+    res = await _alu(dut, AluOp.ADD, XLEN_MASK, XLEN_MASK)
+    assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def add_wrap(dut):
+    exp = (XLEN_MASK + 1) & XLEN_MASK
+    res = await _alu(dut, AluOp.ADD, XLEN_MASK, 1)
+    assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
 @cocotb.test(skip=(WIDTH < 64))
 async def addw_basic(dut):
     for _ in range(20):
@@ -80,6 +94,20 @@ async def sub_basic(dut):
         exp = (a - b) & XLEN_MASK
         res = await _alu(dut, AluOp.SUB, a, b)
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def sub_borrow(dut):
+    exp = (0 - 1) & XLEN_MASK
+    res = await _alu(dut, AluOp.SUB, 0, 1)
+    assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def sub_borrow_one(dut):
+    exp = (0 - XLEN_MASK) & XLEN_MASK
+    res = await _alu(dut, AluOp.SUB, 0, XLEN_MASK)
+    assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
 @cocotb.test(skip=(WIDTH < 64))
