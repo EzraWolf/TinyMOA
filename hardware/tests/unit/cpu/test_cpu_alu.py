@@ -1,10 +1,14 @@
-import cocotb
+import os
 import random
+import pytest
+import cocotb
 from enum import Enum
 from cocotb.triggers import Timer
+from ...runner import run
 
-X32_MASK = 0xFFFF_FFFF
-X64_MASK = 0xFFFF_FFFF_FFFF_FFFF
+
+WIDTH = int(os.environ.get("WIDTH", 8))
+XLEN_MASK = 2**WIDTH - 1
 
 
 class AluOp(Enum):
@@ -33,61 +37,98 @@ async def _alu(dut, i_op: AluOp, i_a, i_b):
     return int(dut.o_res.value)
 
 
-def _sext32(x: int):
-    return x | 0xFFFF_FFFF_0000_0000 if x >> 31 else x
+def _sext(x: int, bits: int):
+    if x & (1 << (bits - 1)):
+        return x | ((-1) << bits)
+    return x
+
+
+@cocotb.test()
+async def params_set(dut):
+    assert WIDTH == len(dut.i_a)
+    assert WIDTH == len(dut.i_b)
+    assert WIDTH == len(dut.o_res)
 
 
 @cocotb.test()
 async def add_basic(dut):
     for _ in range(20):
-        a = random.randint(0, X64_MASK)
-        b = random.randint(0, X64_MASK)
-        assert (a + b) & X64_MASK == await _alu(dut, AluOp.ADD, a, b)
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
+        exp = (a + b) & XLEN_MASK
+        res = await _alu(dut, AluOp.ADD, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
-@cocotb.test()
+@cocotb.test(skip=(WIDTH < 64))
 async def addw_basic(dut):
+    X32_MASK = 0xFFFF_FFFF
     for _ in range(20):
         a = random.randint(0, X32_MASK)
         b = random.randint(0, X32_MASK)
-        assert _sext32((a + b) & X32_MASK) == await _alu(dut, AluOp.ADDW, a, b)
+        exp = _sext((a + b) & X32_MASK, 32) & XLEN_MASK
+        res = await _alu(dut, AluOp.ADDW, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
 @cocotb.test()
 async def sub_basic(dut):
     for _ in range(20):
-        a = random.randint(0, X64_MASK)
-        b = random.randint(0, X64_MASK)
-        assert (a - b) & X64_MASK == await _alu(dut, AluOp.SUB, a, b)
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
+        exp = (a - b) & XLEN_MASK
+        res = await _alu(dut, AluOp.SUB, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
-@cocotb.test()
+@cocotb.test(skip=(WIDTH < 64))
 async def subw_basic(dut):
+    X32_MASK = 0xFFFF_FFFF
     for _ in range(20):
         a = random.randint(0, X32_MASK)
         b = random.randint(0, X32_MASK)
-        assert _sext32((a - b) & X32_MASK) == await _alu(dut, AluOp.SUBW, a, b)
+        exp = _sext((a - b) & X32_MASK, 32) & XLEN_MASK
+        res = await _alu(dut, AluOp.SUBW, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
 @cocotb.test()
 async def or_basic(dut):
     for _ in range(20):
-        a = random.randint(0, X64_MASK)
-        b = random.randint(0, X64_MASK)
-        assert (a | b) == await _alu(dut, AluOp.OR, a, b)
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
+        exp = a | b
+        res = await _alu(dut, AluOp.OR, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
 @cocotb.test()
 async def and_basic(dut):
     for _ in range(20):
-        a = random.randint(0, X64_MASK)
-        b = random.randint(0, X64_MASK)
-        assert (a & b) == await _alu(dut, AluOp.AND, a, b)
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
+        exp = a & b
+        res = await _alu(dut, AluOp.AND, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
 
 
 @cocotb.test()
 async def xor_basic(dut):
     for _ in range(20):
-        a = random.randint(0, X64_MASK)
-        b = random.randint(0, X64_MASK)
-        assert (a ^ b) == await _alu(dut, AluOp.XOR, a, b)
+        a = random.randint(0, XLEN_MASK)
+        b = random.randint(0, XLEN_MASK)
+        exp = a ^ b
+        res = await _alu(dut, AluOp.XOR, a, b)
+        assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@pytest.mark.parametrize(
+    "p",
+    [
+        {"WIDTH": 8},
+        {"WIDTH": 32},
+        {"WIDTH": 64},
+    ],
+)
+def test_cpu_alu(p):
+    run("cpu", "alu", ["~cpu/cpu_alu.sv", "~cpu/pkgs/pkg_cpu_alu.sv"], params=p)
