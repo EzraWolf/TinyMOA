@@ -171,6 +171,42 @@ async def sltu_basic(dut):
 
 
 @cocotb.test()
+async def slt_equal(dut):
+    res = await _alu(dut, AluOp.SLT, 42, 42)
+    assert res == 0, f"expected 0 got {hex(res)}"
+
+
+@cocotb.test()
+async def slt_neg(dut):
+    res = await _alu(dut, AluOp.SLT, XLEN_MASK, 0)
+    assert res == 1, f"expected 1 got {hex(res)}"
+
+
+@cocotb.test()
+async def slt_pos(dut):
+    res = await _alu(dut, AluOp.SLT, 0, XLEN_MASK)
+    assert res == 0, f"expected 0 got {hex(res)}"
+
+
+@cocotb.test()
+async def sltu_equal(dut):
+    res = await _alu(dut, AluOp.SLTU, 42, 42)
+    assert res == 0, f"expected 0 got {hex(res)}"
+
+
+@cocotb.test()
+async def sltu_zero(dut):
+    res = await _alu(dut, AluOp.SLTU, 0, XLEN_MASK)
+    assert res == 1, f"expected 1 got {hex(res)}"
+
+
+@cocotb.test()
+async def sltu_max(dut):
+    res = await _alu(dut, AluOp.SLTU, XLEN_MASK, 0)
+    assert res == 0, f"expected 0 got {hex(res)}"
+
+
+@cocotb.test()
 async def sll_basic(dut):
     for _ in range(20):
         a = random.randint(0, XLEN_MASK)
@@ -198,6 +234,34 @@ async def sra_basic(dut):
         exp = (_sext(a, WIDTH) >> b) & XLEN_MASK
         res = await _alu(dut, AluOp.SRA, a, b)
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test()
+async def sll_shift_out(dut):
+    msb = 1 << (WIDTH - 1)
+    res = await _alu(dut, AluOp.SLL, msb, SHAMT_MASK)
+    assert res == 0, f"expected 0 got {hex(res)}"
+
+
+@cocotb.test()
+async def srl_fill_zero(dut):
+    exp = XLEN_MASK >> SHAMT_MASK
+    res = await _alu(dut, AluOp.SRL, XLEN_MASK, SHAMT_MASK)
+    assert res == exp, (f"expected {hex(exp)} got {hex(res)}")
+
+
+@cocotb.test()
+async def sra_fill_sign(dut):
+    res = await _alu(dut, AluOp.SRA, XLEN_MASK, SHAMT_MASK)
+    assert res == XLEN_MASK, f"expected {hex(XLEN_MASK)} got {hex(res)}"
+
+
+@cocotb.test()
+async def sra_fill_zero(dut):
+    pos = XLEN_MASK >> 1
+    exp = pos >> SHAMT_MASK
+    res = await _alu(dut, AluOp.SRA, pos, SHAMT_MASK)
+    assert res == exp, (f"expected {hex(exp)} got {hex(res)}")
 
 
 @cocotb.test(skip=(WIDTH < 64))
@@ -229,6 +293,26 @@ async def sraw_basic(dut):
         exp = _sext(sra32, 32) & XLEN_MASK
         res = await _alu(dut, AluOp.SRAW, a, b)
         assert exp == res, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def sllw_sign(dut):
+    exp = _sext(0x80000000, 32) & XLEN_MASK
+    res = await _alu(dut, AluOp.SLLW, 0x40000000, 1)
+    assert res == exp, f"expected {hex(exp)} got {hex(res)}"
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def srlw_no_sign(dut):
+    res = await _alu(dut, AluOp.SRLW, 0x80000001, 1)
+    assert res == 0x40000000, f"expected 0x40000000 got {hex(res)}"
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def sraw_sign(dut):
+    res = await _alu(dut, AluOp.SRAW, 0x80000000, 1)
+    exp = _sext(0xC0000000, 32) & XLEN_MASK
+    assert res == exp, f"expected {hex(exp)} got {hex(res)}"
 
 
 @pytest.mark.parametrize(
