@@ -25,15 +25,15 @@ thus, (very early) open-source LLM inference SoC built from scratch
 
 ---
 
-more precisely, a highly parameterized out-of-order RISC-V CPU that controls a Language Processing Unit (LPU). the LPU is an embedded transformer using Digital Compute-in-Memory (DCIM) for efficient general matrix-matrix (GEMM) and matrix-vector (GEMV) operations.
+more precisely, a highly parameterized 4-way out-of-order RISC-V CPU that controls a Language Processing Unit (LPU). the LPU is an embedded transformer using Digital Compute-in-Memory (DCIM) for efficient general matrix-matrix (GEMM) and matrix-vector (GEMV) operations.
 
 3x ASICs via [tinytapeout](https://tinytapeout.com) arriving Nov '26 for CPU and DCIM characterization.
 
-## target specs
+## target metrics & specs
 
 - \>30 tok/s, 32K window Llama 3.2 8B Q4
 - \>100 TOPS/W on FP8 (~12x NVIDIA H100 SXM @ 8.4 TOPS/W)
-- OoO RISC-V CPU (parameterized `RV32GC` or `RV64GC`)
+- 4-way OoO RISC-V CPU (parameterized `RV32GC` or `RV64GC`)
 - optional ISA `MAFDCZbb_Zcb_Zicsr_Zifencei_Zicond_Zfbfmin`
 - CPU boots custom uLinux, runs ML models via [tinygrad](https://github.com/tinygrad/tinygrad) 
 - LPU with ~1MB CIM, >4GB GDDR6 (if)
