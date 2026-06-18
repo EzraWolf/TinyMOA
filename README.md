@@ -11,7 +11,7 @@ thus, (very early) open-source LLM inference SoC built from scratch
 
 <h3>
 
-[Docs](docs/)  |  [Portfolio](https://terse.ink)  |  [X](https://x.com/ezrwolf)
+[Docs](docs/)  |  [X](https://x.com/ezrwolf) (updates)  |  [Portfolio](https://terse.ink)
 
 </h3>
 
