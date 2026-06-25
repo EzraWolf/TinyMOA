@@ -19,13 +19,12 @@ pub module cpu_alu #(
         case (i_op) {
             AluOp::ADD : result = i_a + i_b;
             AluOp::SUB : result = i_a - i_b;
-            AluOp::OR  : result = i_a | i_b;
             AluOp::AND : result = i_a & i_b;
+            AluOp::OR  : result = i_a | i_b;
             AluOp::XOR : result = i_a ^ i_b;
             AluOp::SLL : result = i_a << shamt;
             AluOp::SRL : result = i_a >> shamt;
             AluOp::SRA : result = $signed(i_a) >>> shamt;
-            // TODO: Figure out how to support parameterization WIDTH
             AluOp::SLT : result = {1'b0 repeat (WIDTH - 'b1), $signed(i_a) <: $signed(i_b)};
             AluOp::SLTU: result = {1'b0 repeat (WIDTH - 'b1), i_a <: i_b};
             default    : result = '0;

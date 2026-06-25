@@ -1,32 +1,88 @@
-// RV64IC decoder
-// soon RV64IMAFC_Zicsr_Zifencei_BF16
+// RV32I decoder
+// soon RV32I/RV64I + MAFC_Zicsr_Zifencei_BF16
+import pkg_cpu_alu::AluOp;
+import pkg_cpu_alu::OpType;
 
-pub module cpu_decoder (
-    i_instr: input logic<64>,
 
-    o_imm   : output logic<64>,
-    o_alu_op: output logic<4> ,
+pub module cpu_decoder #(
+    param WIDTH: u32 = 32, // must 32 or 64
+) (
+    i_instr  : input  logic<WIDTH>,
+
+    o_rs2    : output logic<5>,
+    o_rs1    : output logic<5>,
+    o_rd     : output logic<5>,
+
+    o_imm    : output logic<WIDTH>,
+
+    o_alu_op : output AluOp,
+    o_alu_op_type: output OpType,
 ) {
-    let quadrant = i_instr[1:0];
-    let opcode   = i_instr[6:2];
+    let imm20   : logic<20> = i_instr[31:12];
+    let imm12   : logic<12> = i_instr[31:20];
+    let imm5    : logic<5>  = i_instr[24:20];
+
+    let funct7  : logic<7> = i_instr[31:25];
+    let rs2     : logic<5> = i_instr[24:20];
+    let rs1     : logic<5> = i_instr[19:15];
+    let funct3  : logic<3> = i_instr[14:12];
+    let rd      : logic<5> = i_instr[11:7];
+    let quadrant: logic<2> = i_instr[1:0];
+    let opcode  : logic<5> = i_instr[6:2];
 
     always_comb {
-        case (quadrant) {
-            2'b00: {}
+        o_rs2 = '0;
+        o_rs1 = '0;
+        o_rd  = '0;
+        o_imm = '0;
 
-            2'b01: {}
+        o_alu_op = AluOp::ADD;
+        o_alu_op_type = OpType::REG;
 
-            2'b10: {}
+        case quadrant {
+            // 2'b00: {}
+            // 2'b01: {}
+            // 2'b10: {}
 
-            // full 64-bit
+            // full RV32I/RV64I
             2'b11: {
-                case (opcode) {
+                o_rs2 = rs2;
+                o_rs1 = rs1;
+                o_rd  = rd;
+                case opcode {
 
-                    // R-Type, ALU
-                    5'b01100: {}
-
-                    // I-Type, ALU imm
-                    5'b00100: {}
+                    // R (01100) and I (00100) Type, ALU ops
+                    // only difference is where the source regs come from
+                    5'b01100, 5'b00100: {
+                        if opcode == 5'b00100 {
+                            o_alu_op_type = OpType::IMM;
+                            o_rs2 = '0;
+                            o_imm = imm12;
+                        }
+                        case funct3 {
+                            3'b000: {
+                                if opcode == 5'b01100 && funct7 == 7'b0100000 {
+                                    o_alu_op = AluOp::SUB;
+                                } else { o_alu_op = AluOp::ADD; }
+                            }
+                            3'b111: { o_alu_op = AluOp::AND; }
+                            3'b110: { o_alu_op = AluOp::OR;  }
+                            3'b100: { o_alu_op = AluOp::XOR; }
+                            3'b001: { 
+                                if opcode == 5'b01100 { o_imm = imm5; }
+                                o_alu_op = AluOp::SLL;
+                            }
+                            3'b101: {
+                                if opcode == 5'b01100 { o_imm = imm5; }
+                                case funct7 {
+                                    7'b0000000: { o_alu_op = AluOp::SRL; }
+                                    7'b0100000: { o_alu_op = AluOp::SRA; }
+                                }
+                            }
+                            3'b010:  { o_alu_op = AluOp::SLT;  }
+                            3'b011:  { o_alu_op = AluOp::SLTU; }
+                        }
+                    }
 
                     // I-Type, load
                     5'b00000: {}
@@ -40,8 +96,11 @@ pub module cpu_decoder (
                     // B-Type, branch
                     5'b11000: {}
 
-                    // U-Type, AUIPC
+                    // U-Type, LUI
                     5'b01101: {}
+
+                    // U-Type, AUIPC
+                    5'b00101: {}
 
                     // J-Type, JAL
                     5'b11011: {}
@@ -51,6 +110,8 @@ pub module cpu_decoder (
 
                     // FENCE
                     5'b00011: {}
+
+                    default: { o_illegal = '1; }
                 }
             }
         }
