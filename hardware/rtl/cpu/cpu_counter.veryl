@@ -1,1 +1,24 @@
+pub module cpu_counter #(
+    param WIDTH: u32 = 32,
+) (
+    clk: input clock,
+    rst: input reset,
 
+    i_wen : input  logic,
+    i_data: input  logic<WIDTH>,
+
+    o_data: output logic<WIDTH>,
+) {
+    var counter: logic<WIDTH>;
+    always_ff (clk, rst) {
+        if_reset {
+            counter = '0;
+        } else if (i_wen) {
+            counter = i_data;
+        } else {
+            counter += 1;
+        }
+    }
+
+    assign o_data = counter;
+}
