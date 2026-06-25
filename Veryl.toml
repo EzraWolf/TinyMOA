@@ -13,3 +13,7 @@ exclude_std = false
 [test]
 simulator = "verilator"
 waveform_format = "fst"
+
+[format]
+vertical_align = true
+newline_style = "unix"

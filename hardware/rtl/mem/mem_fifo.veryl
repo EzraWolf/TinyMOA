@@ -1,34 +1,38 @@
 // Simple FIFO
 
 pub module mem_fifo #(
-    param WIDTH: u32 = 64,
+    param WIDTH: u32 = 64 ,
     param DEPTH: u32 = 128,
 ) (
     clk: input clock,
     rst: input reset,
 
-    i_wen  : input  logic,
+    i_wen  : input logic,
     i_data : input  logic<WIDTH>,
-    o_full : output logic,
 
-    i_ren  : input  logic,
+    i_ren  :  input logic,    
     o_data : output logic<WIDTH>,
+
+    o_full : output logic,
     o_empty: output logic,
 ) {
-    var is_read: logic;
+    var buffer: logic<WIDTH> [DEPTH];
 
-    var w_ptr  : logic<$clog2(DEPTH)>;
-    var r_ptr  : logic<$clog2(DEPTH)>;
-    var buffer : logic<WIDTH>[DEPTH];
+    var w_ptr: logic<$clog2(DEPTH)>;
+    var r_ptr: logic<$clog2(DEPTH)>;
+
+    var is_read: logic;
 
     // write
     always_ff (clk, rst) {
         if_reset {
             w_ptr = '0;
-            for i in 0..DEPTH { buffer[i] = '0; }
+            for i in 0..DEPTH {
+                buffer[i] = '0;
+            }
         } else {
             if i_wen && !o_full {
-                buffer[w_ptr] =  i_data;
+                buffer[w_ptr] = i_data;
                 w_ptr += '1;
             }
         }
@@ -41,8 +45,8 @@ pub module mem_fifo #(
             o_data = '0;
         } else {
             if i_ren && !o_empty {
-                o_data =  buffer[r_ptr];
-                r_ptr  += '1;
+                o_data = buffer[r_ptr];
+                r_ptr += '1;
             }
         }
     }
@@ -62,35 +66,28 @@ pub module mem_fifo #(
     }
 
     assign o_full  = r_ptr == w_ptr && !is_read;
-    assign o_empty = r_ptr == w_ptr &&  is_read;
+    assign o_empty = r_ptr == w_ptr && is_read;
 }
 
-
 pub module dut_mem_fifo #(
-    param WIDTH: u32 = 64,
+    param WIDTH: u32 = 64 ,
     param DEPTH: u32 = 128,
 ) (
     clk: input clock,
     rst: input reset,
 
-    i_wen  : input  logic,
-    i_data : input  logic<WIDTH>,
-    o_full : output logic,
+    i_wen : input  logic       ,
+    i_data: input  logic<WIDTH>,
+    o_full: output logic       ,
 
-    i_ren  : input  logic,
+    i_ren  : input  logic       ,
     o_data : output logic<WIDTH>,
-    o_empty: output logic,
+    o_empty: output logic       ,
 ) {
     initial {
         $dumpfile("dut_mem_fifo.fst");
         $dumpvars(0, dut_mem_fifo);
     }
 
-    inst dut_mem_fifo: mem_fifo #(
-        WIDTH, DEPTH
-    ) (
-        clk, rst,
-        i_wen, i_data, o_full,
-        i_ren, o_data, o_empty,
-    );
+    inst dut_mem_fifo: mem_fifo #( WIDTH, DEPTH ) ( clk, rst, i_wen, i_data, o_full, i_ren, o_data, o_empty );
 }

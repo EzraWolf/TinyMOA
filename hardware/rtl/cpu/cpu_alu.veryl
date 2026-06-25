@@ -11,39 +11,32 @@ pub module cpu_alu #(
     o_res: output logic<WIDTH>,
 ) {
 
-    var result : logic<WIDTH>;
-    let shamt  : logic<$clog2(WIDTH)> = i_b[$clog2(WIDTH)-1:0];
+    var result: logic<WIDTH>;
+
+    let shamt: logic<$clog2(WIDTH)> = i_b[$clog2(WIDTH) - 1:0];
 
     always_comb {
         case (i_op) {
             AluOp::ADD : result = i_a + i_b;
-            //AluOp::ADDW: result = {add32[msb] repeat WIDTH-32, add32};
             AluOp::SUB : result = i_a - i_b;
-            //AluOp::SUBW: result = {sub32[msb] repeat WIDTH-32, sub32};
             AluOp::OR  : result = i_a | i_b;
             AluOp::AND : result = i_a & i_b;
             AluOp::XOR : result = i_a ^ i_b;
-
             AluOp::SLL : result = i_a << shamt;
-            //AluOp::SLLW: result = {sll32[msb] repeat WIDTH-32, sll32};
             AluOp::SRL : result = i_a >> shamt;
-            //AluOp::SRLW: result = {srl32[msb] repeat WIDTH-32, srl32};
             AluOp::SRA : result = $signed(i_a) >>> shamt;
-            //AluOp::SRAW: result = {sra32[msb] repeat WIDTH-32, sra32};
-
-            // Figure out how to support parameterizatio WIDTH
-            AluOp::SLT : result = {1'b0 repeat WIDTH-'b1, $signed(i_a) <: $signed(i_b)};
-            AluOp::SLTU: result = {1'b0 repeat WIDTH-'b1, i_a <: i_b};
-
-            default: result = '0;
+            // TODO: Figure out how to support parameterization WIDTH
+            AluOp::SLT : result = {1'b0 repeat (WIDTH - 'b1), $signed(i_a) <: $signed(i_b)};
+            AluOp::SLTU: result = {1'b0 repeat (WIDTH - 'b1), i_a <: i_b};
+            default    : result = '0;
         }
     }
-    var w_result: logic<WIDTH>;
-    if (WIDTH >= 64) : gen_w_ops {
 
+    var w_result: logic<WIDTH>;
+    if (WIDTH >= 64) :gen_w_ops {
         let i_a32: logic<32> = i_a[31:0];
         let i_b32: logic<32> = i_b[31:0];
-    
+
         let add32: logic<32> = i_a32 + i_b32;
         let sub32: logic<32> = i_a32 - i_b32;
         let sll32: logic<32> = i_a32 << shamt;
@@ -52,20 +45,21 @@ pub module cpu_alu #(
 
         always_comb {
             case (i_op) {
-                AluOp::ADDW: w_result = {add32[msb] repeat WIDTH-32, add32};
-                AluOp::SUBW: w_result = {sub32[msb] repeat WIDTH-32, sub32};
-                AluOp::SLLW: w_result = {sll32[msb] repeat WIDTH-32, sll32};
-                AluOp::SRLW: w_result = {srl32[msb] repeat WIDTH-32, srl32};
-                AluOp::SRAW: w_result = {sra32[msb] repeat WIDTH-32, sra32};
-                default: w_result = '0;
+                AluOp::ADDW: w_result = {add32[msb] repeat WIDTH - 32, add32};
+                AluOp::SUBW: w_result = {sub32[msb] repeat WIDTH - 32, sub32};
+                AluOp::SLLW: w_result = {sll32[msb] repeat WIDTH - 32, sll32};
+                AluOp::SRLW: w_result = {srl32[msb] repeat WIDTH - 32, srl32};
+                AluOp::SRAW: w_result = {sra32[msb] repeat WIDTH - 32, sra32};
+                default    : w_result = '0;
             }
         }
     }
+
     assign o_res = result | w_result;
 }
 
 pub module dut_cpu_alu #(
-    param WIDTH: u32 = 64
+    param WIDTH: u32 = 64,
 ) (
     i_op: input pkg_cpu_alu::AluOp,
 
@@ -79,9 +73,5 @@ pub module dut_cpu_alu #(
         $dumpvars(0, dut_cpu_alu);
     }
 
-    inst dut_cpu_alu: cpu_alu #(
-        WIDTH
-    ) (
-        i_op, i_a, i_b, o_res
-    );
+    inst dut_cpu_alu: cpu_alu #( WIDTH ) ( i_op, i_a, i_b, o_res );
 }
