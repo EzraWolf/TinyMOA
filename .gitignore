@@ -10,6 +10,7 @@ CLAUDE.md
 .vscode/
 .idea/
 .mypy_cache/
+.temp/
 
 # Python
 __pycache__/
