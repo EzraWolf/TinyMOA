@@ -2,7 +2,7 @@
 // All parameters to configure TinyMOA live here
 
 pub package pkg_soc {
-    const XLEN: u8 = 32; // 32 or 64 ONLY!!
+    const XLEN: u32 = 32; // 32 or 64 ONLY!!
 }
 
 pub package pkg_cpu {
@@ -30,33 +30,33 @@ pub package pkg_cpu {
     const USE_MMU_Sv32: bbool = USE_LINUX && (pkg_soc::XLEN == 32);
     const USE_MMU_Sv39: bbool = USE_LINUX && (pkg_soc::XLEN == 64);
 
-    const ALU_W_OP_EN : bbool = pkg_soc::XLEN >= 32; // *W ops for 64/128-bit ISA
+    const ALU_W_OP_EN: bbool = pkg_soc::XLEN >= 32; // *W ops for 64/128-bit ISA
 
     // CPU frontend
 
     const USE_BPU: bbool = true;
 
-    const FETCH_WIDTH : u8 = 8;
-    const DECODE_WIDTH: u8 = 8;
-    const ROB_ENTRIES : u8 = 128;
+    const FETCH_WIDTH : u32 = 8;
+    const DECODE_WIDTH: u32 = 8;
+    const ROB_ENTRIES : u32 = 128;
 
-    const REGFILE_INT_NUM : u8 = 128;
-    const REGFILE_FP_NUM  : u8 = 96;
-    const REGFILE_VEC_NUML: u8 = 96;
+    const REGFILE_INT_NUM : u32 = 128;
+    const REGFILE_FP_NUM  : u32 = 96;
+    const REGFILE_VEC_NUML: u32 = 96;
 
     // CPU backend execution units (EUs)
-    const ALU_NUM: u8 = 4;
-    const FPU_NUM: u8 = 2;
-    const VPU_NUM: u8 = 2;
-    const AGU_NUM: u8 = 2;
+    const ALU_NUM: u32 = 4;
+    const FPU_NUM: u32 = 2;
+    const VPU_NUM: u32 = 2;
+    const AGU_NUM: u32 = 2;
 }
 
 pub package pkg_lpu {
     const LPU_EN: bbool = true;
 
-    const CIM_DIM    : u8 = 32; // NxN corelet array
-    const CORELET_DIM: u8 = 8;  // corelet KxK size
-    const CORELET_MLC: u8 = 4;  // bits/cell
+    const CIM_DIM    : u32 = 32; // NxN corelet array
+    const CORELET_DIM: u32 = 8;  // corelet KxK size
+    const CORELET_MLC: u32 = 4;  // bits/cell
 
     // Informed from
     // https://github.com/deepseek-ai/DeepSeek-V3.2-Exp/blob/87e509a2e5a100d221c97df52c6e8be7835f0057/inference/config_671B_v3.2.json
