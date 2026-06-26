@@ -3,11 +3,6 @@
 // all instructions here can double as appropriate immediate ops
 // e.g., "ADD" works the same as "ADDI"
 pub package pkg_cpu_alu {
-    enum OpType: logic<1> {
-        REG,
-        IMM,
-    }
-
     enum AluOp: logic<4> {
 
         ADD = 4'b0000,

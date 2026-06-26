@@ -1,7 +1,7 @@
 // RV32I decoder
 // soon RV32I/RV64I + MAFC_Zicsr_Zifencei_BF16
+import pkg_cpu::OpType;
 import pkg_cpu_alu::AluOp;
-import pkg_cpu_alu::OpType;
 
 
 pub module cpu_decoder #(
