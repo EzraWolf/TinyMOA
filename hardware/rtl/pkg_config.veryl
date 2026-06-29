@@ -39,11 +39,12 @@ pub package pkg_cpu {
         PC,
     }
 
-    enum DstType: logic<1> {
+    enum DstType: logic<2> {
+        NONE,
         REG,
         MEM,
     }
-    
+
     // CPU frontend
 
     const USE_BPU: bbool = true;

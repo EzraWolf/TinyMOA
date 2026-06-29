@@ -51,16 +51,16 @@ pub module cpu_decoder (
 
             // full RV32I/RV64I
             2'b11: {
-                o_rs2 = rs2;
-                o_rs1 = rs1;
-                o_rd  = rd;
+                o_rs2      = rs2;
+                o_rs1      = rs1;
+                o_rd       = rd;
                 o_fu_src_a = SrcType::REG;
                 o_fu_src_b = SrcType::REG;
                 o_fu_dst   = DstType::REG;
 
                 case op {
 
-                    // R (01100) and I (00100) Type, ALU ops
+                    // R (01100), I (00100) Type (reg-reg, immediate ALU ops)
                     // only difference is where the source regs come from
                     5'b01100, 5'b00100: {
                         if op == 5'b00100 {
@@ -93,18 +93,29 @@ pub module cpu_decoder (
                         }
                     }
 
-                    // I-Type, load
+                    // I-Type (load)
                     5'b00000: {}
 
-                    // I-Type, JALR
+                    // I-Type (JALR)
                     5'b11001: {}
 
-                    // S-Type, store
+                    // S-Type (store)
                     5'b01000: {}
 
-                    // B-Type, branch
+                    // B-Type (branch)
                     5'b11000: {
-                        
+                        o_fu_src_a = SrcType::REG;
+                        o_fu_src_b = SrcType::REG;
+                        o_fu_dst   = DstType::NONE;
+                        o_imm      = imm_b;
+                        case funct3 {
+                            // take BEQ/BNE branch when XOR == 0/not 0
+                            // take BLT/BGE branch when SLT == 1/not 0
+                            3'b000, 3'b001: { o_fu_op = AluOp::XOR;  } // BEQ,  BNE
+                            3'b100, 3'b101: { o_fu_op = AluOp::SLT;  } // BLT,  BGE
+                            3'b110, 3'b111: { o_fu_op = AluOp::SLTU; } // BLTU, BGEU
+                            default:        { o_fu_op = AluOp::XOR;  }
+                        }
                     }
 
                     // U-Type: AUIPC (00101), LUI (01101)
