@@ -1,34 +1,37 @@
 // RV32I decoder
 // soon RV32I/RV64I + MAFC_Zicsr_Zifencei_BF16
-import pkg_cpu::OpType;
+import pkg_cpu::SrcType;
+import pkg_cpu::DstType;
 import pkg_cpu_alu::AluOp;
 
+pub module cpu_decoder (
+    i_instr   : input  logic<32>,
 
-pub module cpu_decoder #(
-    param WIDTH: u32 = 32, // must 32 or 64
-) (
-    i_instr  : input  logic<WIDTH>,
+    o_rs2     : output logic<5>,
+    o_rs1     : output logic<5>,
+    o_rd      : output logic<5>,
 
-    o_rs2    : output logic<5>,
-    o_rs1    : output logic<5>,
-    o_rd     : output logic<5>,
+    o_imm     : output logic<32>,
 
-    o_imm    : output logic<WIDTH>,
-
-    o_alu_op : output AluOp,
-    o_alu_op_type: output OpType,
+    o_fu_op   : output AluOp,
+    o_fu_src_b: output SrcType,
+    o_fu_src_a: output SrcType,
+    o_fu_dst  : output DstType,
 ) {
-    let imm20   : logic<20> = i_instr[31:12];
-    let imm12   : logic<12> = i_instr[31:20];
-    let imm5    : logic<5>  = i_instr[24:20];
+    let imm_i : logic<31> = {i_instr[msb] repeat 21, i_instr[30:20]};
+    let imm_s : logic<31> = {i_instr[msb] repeat 21, i_instr[30:25], i_instr[11:7]};
+    let imm_b : logic<32> = {i_instr[msb] repeat 20, i_instr[7], i_instr[30:25], i_instr[11:8], 1'b0};
+    let imm_j : logic<32> = {i_instr[msb] repeat 11, i_instr[19:12], i_instr[20], i_instr[30:21], 1'b0};
+    let imm_u : logic<32> = {i_instr[31:12], 12'b0};
+    let shamnt: logic<32> = {0 repeat 27, i_instr[24:20]};
 
-    let funct7  : logic<7> = i_instr[31:25];
-    let rs2     : logic<5> = i_instr[24:20];
-    let rs1     : logic<5> = i_instr[19:15];
-    let funct3  : logic<3> = i_instr[14:12];
-    let rd      : logic<5> = i_instr[11:7];
-    let quadrant: logic<2> = i_instr[1:0];
-    let opcode  : logic<5> = i_instr[6:2];
+    let funct7: logic<7> = i_instr[31:25];
+    let rs2   : logic<5> = i_instr[24:20];
+    let rs1   : logic<5> = i_instr[19:15];
+    let funct3: logic<3> = i_instr[14:12];
+    let rd    : logic<5> = i_instr[11:7];
+    let quad  : logic<2> = i_instr[1:0];
+    let op    : logic<5> = i_instr[6:2];
 
     always_comb {
         o_rs2 = '0;
@@ -36,10 +39,12 @@ pub module cpu_decoder #(
         o_rd  = '0;
         o_imm = '0;
 
-        o_alu_op = AluOp::ADD;
-        o_alu_op_type = OpType::REG;
+        o_fu_op    = AluOp::ADD;
+        o_fu_src_a = SrcType::ZERO;
+        o_fu_src_b = SrcType::ZERO;
+        o_fu_dst   = DstType::REG;
 
-        case quadrant {
+        case quad {
             // 2'b00: {}
             // 2'b01: {}
             // 2'b10: {}
@@ -49,38 +54,42 @@ pub module cpu_decoder #(
                 o_rs2 = rs2;
                 o_rs1 = rs1;
                 o_rd  = rd;
-                case opcode {
+                o_fu_src_a = SrcType::REG;
+                o_fu_src_b = SrcType::REG;
+                o_fu_dst   = DstType::REG;
+
+                case op {
 
                     // R (01100) and I (00100) Type, ALU ops
                     // only difference is where the source regs come from
                     5'b01100, 5'b00100: {
-                        if opcode == 5'b00100 {
-                            o_alu_op_type = OpType::IMM;
+                        if op == 5'b00100 {
+                            o_fu_src_b = SrcType::IMM;
                             o_rs2 = '0;
-                            o_imm = imm12;
+                            o_imm = imm_i;
                         }
                         case funct3 {
                             3'b000: {
-                                if opcode == 5'b01100 && funct7 == 7'b0100000 {
-                                    o_alu_op = AluOp::SUB;
-                                } else { o_alu_op = AluOp::ADD; }
+                                if op == 5'b01100 && funct7 == 7'b0100000 {
+                                    o_fu_op = AluOp::SUB;
+                                } else { o_fu_op = AluOp::ADD; }
                             }
-                            3'b111: { o_alu_op = AluOp::AND; }
-                            3'b110: { o_alu_op = AluOp::OR;  }
-                            3'b100: { o_alu_op = AluOp::XOR; }
+                            3'b111: { o_fu_op = AluOp::AND; }
+                            3'b110: { o_fu_op = AluOp::OR;  }
+                            3'b100: { o_fu_op = AluOp::XOR; }
                             3'b001: { 
-                                if opcode == 5'b01100 { o_imm = imm5; }
-                                o_alu_op = AluOp::SLL;
+                                if op == 5'b00100 { o_imm = shamnt; }
+                                o_fu_op = AluOp::SLL;
                             }
                             3'b101: {
-                                if opcode == 5'b01100 { o_imm = imm5; }
+                                if op == 5'b00100 { o_imm = shamnt; }
                                 case funct7 {
-                                    7'b0000000: { o_alu_op = AluOp::SRL; }
-                                    7'b0100000: { o_alu_op = AluOp::SRA; }
+                                    7'b0000000: { o_fu_op = AluOp::SRL; }
+                                    7'b0100000: { o_fu_op = AluOp::SRA; }
                                 }
                             }
-                            3'b010:  { o_alu_op = AluOp::SLT;  }
-                            3'b011:  { o_alu_op = AluOp::SLTU; }
+                            3'b010:  { o_fu_op = AluOp::SLT;  }
+                            3'b011:  { o_fu_op = AluOp::SLTU; }
                         }
                     }
 
@@ -94,13 +103,13 @@ pub module cpu_decoder #(
                     5'b01000: {}
 
                     // B-Type, branch
-                    5'b11000: {}
+                    5'b11000: {
+                        
+                    }
 
-                    // U-Type, LUI
-                    5'b01101: {}
-
-                    // U-Type, AUIPC
-                    5'b00101: {}
+                    // U-Type: AUIPC (00101), LUI (01101)
+                    // TODO: assign at rename, skip backend (ALU) altogether
+                    5'b00101, 5'b01101: {}
 
                     // J-Type, JAL
                     5'b11011: {}
@@ -111,7 +120,7 @@ pub module cpu_decoder #(
                     // FENCE
                     5'b00011: {}
 
-                    default: { o_illegal = '1; }
+                    default: {}
                 }
             }
         }

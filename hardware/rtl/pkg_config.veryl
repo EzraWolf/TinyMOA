@@ -32,9 +32,16 @@ pub package pkg_cpu {
 
     const ALU_W_OP_EN: bbool = pkg_soc::XLEN >= 32; // *W ops for 64/128-bit ISA
 
-    enum OpType: logic<1> {
+    enum SrcType: logic<2> {
+        ZERO,
         REG,
         IMM,
+        PC,
+    }
+
+    enum DstType: logic<1> {
+        REG,
+        MEM,
     }
     
     // CPU frontend
