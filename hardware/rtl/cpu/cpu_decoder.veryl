@@ -96,11 +96,18 @@ pub module cpu_decoder (
                     // I-Type (load)
                     5'b00000: {}
 
-                    // I-Type (JALR)
-                    5'b11001: {}
-
                     // S-Type (store)
                     5'b01000: {}
+
+                    // J-Type JAL (11011), I-Type JALR (11001)
+                    // TODO: should throw illegal, silently assumes JALR funct3 == 000
+                    5'b11011, 5'b11001: {
+                        o_fu_op    = AluOp::ADD;
+                        o_fu_src_a = SrcType::PC; // PC + 4
+                        o_fu_src_b = SrcType::ZERO;
+                        o_fu_dst   = DstType::REG;
+                        o_imm      = if op == 5'b11011 ? imm_j : imm_i; // JAL:JALR
+                    }
 
                     // B-Type (branch)
                     5'b11000: {
@@ -128,9 +135,6 @@ pub module cpu_decoder (
                         o_fu_dst   = DstType::REG;
                         o_imm      = imm_u;
                     }
-
-                    // J-Type, JAL
-                    5'b11011: {}
 
                     // SYSTEM
                     5'b11100: {}
