@@ -32,21 +32,14 @@ pub package pkg_cpu {
 
     const ALU_W_OP_EN: bbool = pkg_soc::XLEN >= 32; // *W ops for 64/128-bit ISA
 
-    enum SrcType: logic<2> {
-        ZERO,
-        REG,
-        IMM,
-        PC,
-    }
+    // multiplex ALU inputs
+    enum ExeSrc1: logic<2> { NONE, REG,  PC   }
+    enum ExeSrc2: logic<2> { NONE, REG,  IMM  }
 
-    enum DstType: logic<2> {
-        NONE,
-        REG,
-        MEM,
-    }
+    // result mux is actually only 3:1, NONE treated as `REG; reg_wen = 0`
+    enum WbSel: logic<2> { NONE, ALU, PC, MEM }
 
     // CPU frontend
-
     const USE_BPU: bbool = true;
 
     const FETCH_WIDTH : u32 = 8;
