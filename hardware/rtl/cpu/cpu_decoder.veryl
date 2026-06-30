@@ -129,9 +129,8 @@ pub module cpu_decoder (
                     // TODO: assign at rename, skip backend (ALU) altogether
                     5'b00101, 5'b01101: {
                         o_fu_op    = AluOp::ADD;
-                        o_fu_src_a = SrcType::ZERO;
+                        o_fu_src_a = if op == 5'b00101 ? SrcType::PC : SrcType::ZERO; // AUIPC:LUI
                         o_fu_src_b = SrcType::IMM;
-                        if op == 5'b00101 { o_fu_src_a = SrcType::PC; }
                         o_fu_dst   = DstType::REG;
                         o_imm      = imm_u;
                     }
