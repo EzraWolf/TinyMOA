@@ -14,7 +14,7 @@ pub module cpu_decoder (
     o_reg_dest  : output logic<5>,
 
     o_imm       : output logic<32>,
-    o_branch_op : output logic<3>, 
+    o_funct3    : output logic<3>, // for branch & LSU
 
     o_exe_op    : output AluOp,
     o_exe_src1  : output ExeSrc1,
@@ -52,7 +52,7 @@ pub module cpu_decoder (
 
     always_comb {
         o_imm        = 32'b0;
-        o_branch_op  = 3'b0;
+        o_funct3     = 3'b0;
         o_exe_op     = AluOp::ADD;
         o_exe_src1   = ExeSrc1::NONE;
         o_exe_src2   = ExeSrc2::NONE;
@@ -71,6 +71,7 @@ pub module cpu_decoder (
 
             // full RV32I/RV64I
             2'b11: {
+                o_funct3   = funct3;
                 o_exe_src1 = ExeSrc1::REG;
                 o_exe_src2 = ExeSrc2::REG;
                 o_wb_sel   = WbSel::ALU;
@@ -114,11 +115,9 @@ pub module cpu_decoder (
                         o_wb_sel   = WbSel::MEM;
                         o_imm      = imm_i;
                         case funct3 {
-                            3'b010: {} // LW
-                            3'b001: {} // LH
-                            3'b101: {} // LHU
-                            3'b000: {} // LB
-                            3'b100: {} // LBU
+                            3'b010        : {} // LW
+                            3'b001, 3'b101: {} // LH, LHU
+                            3'b000, 3'b100: {} // LB, LBU
                             default: { o_is_illegal = 1'b1; }
                         }
                     }
@@ -143,19 +142,16 @@ pub module cpu_decoder (
                         if op[1] == 1'b0 && funct3 != 3'b000 { o_is_illegal = 1'b1; }
                     }
 
-                    // B-Type (branch)
+                    // B-Type (branch). uses BRU not ALU
                     5'b11000: {
                         o_is_branch = 1'b1;
-                        o_branch_op = funct3;
                         o_wb_sel    = WbSel::NONE;
                         o_imm       = imm_b;
                         case funct3 {
-                            // take BEQ/BNE branch when XOR == 0/not 0
-                            // take BLT/BGE branch when SLT == 1/not 0
-                            3'b000, 3'b001: { o_exe_op = AluOp::XOR;  } // BEQ,  BNE
-                            3'b100, 3'b101: { o_exe_op = AluOp::SLT;  } // BLT,  BGE
-                            3'b110, 3'b111: { o_exe_op = AluOp::SLTU; } // BLTU, BGEU
-                            default:        { o_is_illegal = 1'b1;    }
+                            3'b000, 3'b001: {} // BEQ, BNE
+                            3'b100, 3'b110: {} // BLT, BLTU
+                            3'b101, 3'b111: {} // BGE, BGEU
+                            default:        { o_is_illegal = 1'b1; }
                         }
                     }
 
