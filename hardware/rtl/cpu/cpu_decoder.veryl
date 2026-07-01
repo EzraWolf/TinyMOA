@@ -45,10 +45,11 @@ pub module cpu_decoder (
     let op    : logic<5>  = i_instr[6:2];
 
     assign o_reg_wen = o_wb_sel != WbSel::NONE;
-    assign o_reg_src1 = if (o_exe_src1 == ExeSrc1::REG) ? rs1 : 5'b0;
-    assign o_reg_src2 = if (o_exe_src2 == ExeSrc2::REG) ? rs2 : 5'b0;
-    assign o_reg_dest = if (o_wb_sel   != WbSel::NONE ) ? rd  : 5'b0;
-    assign o_mem_ren  = o_wb_sel == WbSel::MEM;
+    assign o_reg_src1 = if (o_exe_src1 != ExeSrc1::NONE) ? rs1 : 5'b0;
+    assign o_reg_src2 = if (o_exe_src2 != ExeSrc2::NONE) ? rs2 : 5'b0;
+    assign o_reg_dest = if (o_wb_sel   != WbSel::NONE  ) ? rd  : 5'b0;
+    assign o_mem_ren  = o_wb_sel == WbSel::MEM || o_is_load  == 1'b1;
+    assign o_mem_wen  = o_is_store == 1'b1;
 
     always_comb {
         o_imm        = 32'b0;
@@ -57,7 +58,6 @@ pub module cpu_decoder (
         o_exe_src1   = ExeSrc1::NONE;
         o_exe_src2   = ExeSrc2::NONE;
         o_wb_sel     = WbSel::NONE;
-        o_mem_wen    = 1'b0;
         o_is_load    = 1'b0;
         o_is_store   = 1'b0;
         o_is_jump    = 1'b0;
@@ -125,6 +125,15 @@ pub module cpu_decoder (
                     // S-Type store ops
                     5'b01000: {
                         o_is_store = 1'b1;
+                        o_exe_src2 = ExeSrc2::IMM;
+                        o_wb_sel   = WbSel::NONE;
+                        o_imm      = imm_s;
+                        case funct3 {
+                            3'b010: {} // SW
+                            3'b001: {} // SH
+                            3'b000: {} // SB
+                            default: { o_is_illegal = 1'b1; }
+                        }
                     }
 
                     // J-Type JAL (11011), I-Type JALR (11001)
@@ -164,12 +173,8 @@ pub module cpu_decoder (
                         o_imm      = imm_u;
                     }
 
-                    // SYSTEM
-                    5'b11100: {}
-
-                    // FENCE
-                    5'b00011: {}
-
+                    // 5'b11100: {} // TODO: system
+                    // 5'b00011: {} // TODO: fence
                     default: { o_is_illegal = 1'b1; }
                 }   
             }
