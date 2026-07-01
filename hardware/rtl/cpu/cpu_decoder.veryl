@@ -1,5 +1,4 @@
-// RV32I decoder
-// soon RV32I/RV64I + MAFC_Zicsr_Zifencei_BF16
+// RV32I decoder. soon to be RV32I/RV64I + optional MAFC_Zicsr_Zifencei_BF16
 import pkg_cpu::ExeSrc1;
 import pkg_cpu::ExeSrc2;
 import pkg_cpu::WbSel;
@@ -8,22 +7,22 @@ import pkg_cpu_alu::AluOp;
 pub module cpu_decoder (
     i_instr     : input  logic<32>,
 
-    o_reg_wen   : output logic,
     o_reg_src1  : output logic<5>,
     o_reg_src2  : output logic<5>,
     o_reg_dest  : output logic<5>,
-
-    o_imm       : output logic<32>,
-    o_funct3    : output logic<3>, // for branch & LSU
+    o_reg_wen   : output logic,
 
     o_exe_op    : output AluOp,
     o_exe_src1  : output ExeSrc1,
     o_exe_src2  : output ExeSrc2,
-    o_wb_sel    : output WbSel,
+    o_imm       : output logic<32>,
 
     o_mem_ren   : output logic,
     o_mem_wen   : output logic,
 
+    o_wb_sel    : output WbSel,
+
+    o_funct3    : output logic<3>, // for branch & LSU
     o_is_load   : output logic,
     o_is_store  : output logic,
     o_is_jump   : output logic,
@@ -41,23 +40,25 @@ pub module cpu_decoder (
     let rs1   : logic<5>  = i_instr[19:15];
     let funct3: logic<3>  = i_instr[14:12];
     let rd    : logic<5>  = i_instr[11:7];
-    let quad  : logic<2>  = i_instr[1:0];
     let op    : logic<5>  = i_instr[6:2];
+    let quad  : logic<2>  = i_instr[1:0];
 
-    assign o_reg_wen = o_wb_sel != WbSel::NONE;
     assign o_reg_src1 = if (o_exe_src1 != ExeSrc1::NONE) ? rs1 : 5'b0;
     assign o_reg_src2 = if (o_exe_src2 != ExeSrc2::NONE) ? rs2 : 5'b0;
     assign o_reg_dest = if (o_wb_sel   != WbSel::NONE  ) ? rd  : 5'b0;
-    assign o_mem_ren  = o_wb_sel == WbSel::MEM || o_is_load  == 1'b1;
+    assign o_reg_wen  = o_wb_sel != WbSel::NONE;
+    assign o_mem_ren  = o_is_load  == 1'b1 || o_wb_sel == WbSel::MEM;
     assign o_mem_wen  = o_is_store == 1'b1;
 
     always_comb {
-        o_imm        = 32'b0;
-        o_funct3     = 3'b0;
         o_exe_op     = AluOp::ADD;
         o_exe_src1   = ExeSrc1::NONE;
         o_exe_src2   = ExeSrc2::NONE;
+        o_imm        = 32'b0;
+
         o_wb_sel     = WbSel::NONE;
+
+        o_funct3     = 3'b0;
         o_is_load    = 1'b0;
         o_is_store   = 1'b0;
         o_is_jump    = 1'b0;
@@ -68,19 +69,14 @@ pub module cpu_decoder (
             // 2'b00: {}
             // 2'b01: {}
             // 2'b10: {}
-
-            // full RV32I/RV64I
-            2'b11: {
-                o_funct3   = funct3;
+            2'b11: { // full RV32I/RV64I/RV128I
                 o_exe_src1 = ExeSrc1::REG;
                 o_exe_src2 = ExeSrc2::REG;
                 o_wb_sel   = WbSel::ALU;
+                o_funct3   = funct3;
 
                 case op {
-
-                    // R-Type ALU ops
-                    5'b01100: {
-                        o_wb_sel = WbSel::ALU;
+                    5'b01100: { // R-Type ALU reg-reg ops
                         case {funct3, funct7} {
                             {3'b000, 7'b0000000}: o_exe_op = AluOp::ADD;
                             {3'b000, 7'b0100000}: o_exe_op = AluOp::SUB;
@@ -95,12 +91,9 @@ pub module cpu_decoder (
                             default: o_is_illegal = 1'b1;
                         }
                     }
-
-                    // I-Type ALU ops
-                    5'b00100: {
+                    5'b00100: { // I-Type ALU reg-immediate ops
                         o_exe_src2 = ExeSrc2::IMM;
                         o_imm      = imm_i;
-                        o_wb_sel   = WbSel::ALU;
                         case funct3 {
                             3'b000: o_exe_op = AluOp::ADD;
                             3'b111: o_exe_op = AluOp::AND;
@@ -119,13 +112,11 @@ pub module cpu_decoder (
                             default: o_is_illegal = 1'b1;
                         }
                     }
-
-                    // I-Type load ops
-                    5'b00000: {
-                        o_is_load  = 1'b1;
+                    5'b00000: { // I-Type load ops
                         o_exe_src2 = ExeSrc2::IMM;
-                        o_wb_sel   = WbSel::MEM;
                         o_imm      = imm_i;
+                        o_wb_sel   = WbSel::MEM;
+                        o_is_load  = 1'b1;
                         case funct3 {
                             3'b010        : {} // LW
                             3'b001, 3'b101: {} // LH, LHU
@@ -133,13 +124,11 @@ pub module cpu_decoder (
                             default: o_is_illegal = 1'b1;
                         }
                     }
-
-                    // S-Type store ops
-                    5'b01000: {
-                        o_is_store = 1'b1;
+                    5'b01000: { // S-Type store ops
                         o_exe_src2 = ExeSrc2::IMM;
-                        o_wb_sel   = WbSel::NONE;
                         o_imm      = imm_s;
+                        o_wb_sel   = WbSel::NONE;
+                        o_is_store = 1'b1;
                         case funct3 {
                             3'b010: {} // SW
                             3'b001: {} // SH
@@ -147,27 +136,25 @@ pub module cpu_decoder (
                             default: o_is_illegal = 1'b1;
                         }
                     }
-
-                    // J-Type JAL (11011), I-Type JALR (11001)
-                    5'b11011, 5'b11001: {
-                        o_is_jump  = 1'b1;
-                        o_wb_sel   = WbSel::PC; // store PC+4 to PRF w/o ALU
+                    5'b11011: { // J-Type JAL
+                        o_exe_src1 = ExeSrc1::PC;
                         o_exe_src2 = ExeSrc2::IMM;
-
-                        // reuse ALU to compute jumps
-                        // JAL:JALR (pc+imm_j : rs1+imm_i)
-                        o_exe_src1 = if op[1] == 1'b1 ? ExeSrc1::PC : ExeSrc1::REG;
-                        o_imm      = if op[1] == 1'b1 ? imm_j       : imm_i;
-
-                        // JALR funct3 must be 3'b000
-                        if op[1] == 1'b0 && funct3 != 3'b000 { o_is_illegal = 1'b1; }
+                        o_imm      = imm_j;
+                        o_wb_sel   = WbSel::PC;
+                        o_is_jump  = 1'b1;
                     }
-
-                    // B-Type (branch). uses BRU not ALU
-                    5'b11000: {
-                        o_is_branch = 1'b1;
+                    5'b11001: { // J-Type JALR
+                        o_exe_src1 = ExeSrc1::REG;
+                        o_exe_src2 = ExeSrc2::IMM;
+                        o_imm      = imm_i;
+                        o_wb_sel   = WbSel::PC;
+                        o_is_jump  = 1'b1;
+                        if funct3 != 3'b000 { o_is_illegal = 1'b1; }
+                    }
+                    5'b11000: { // B-Type branch ops
                         o_wb_sel    = WbSel::NONE;
                         o_imm       = imm_b;
+                        o_is_branch = 1'b1;
                         case funct3 {
                             3'b000, 3'b001: {} // BEQ, BNE
                             3'b100, 3'b110: {} // BLT, BLTU
@@ -175,20 +162,17 @@ pub module cpu_decoder (
                             default: o_is_illegal = 1'b1;
                         }
                     }
-
-                    // U-Type AUIPC (00101), LUI (01101)
-                    // TODO: assign at rename, skip backend (ALU) altogether
-                    5'b00101, 5'b01101: {
+                    5'b00101, 5'b01101: { // U-Type AUIPC, LUI
+                        // TODO: assign at rename, skip backend (ALU) altogether
                         o_exe_src1 = if op[3] == 1'b0 ? ExeSrc1::PC : ExeSrc1::NONE; // AUIPC:LUI
                         o_exe_src2 = ExeSrc2::IMM;
                         o_wb_sel   = WbSel::ALU;
                         o_imm      = imm_u;
                     }
-
                     // 5'b11100: {} // TODO: system
                     // 5'b00011: {} // TODO: fence
                     default: o_is_illegal = 1'b1;
-                }   
+                }
             }
             default: o_is_illegal = 1'b1;
         }
