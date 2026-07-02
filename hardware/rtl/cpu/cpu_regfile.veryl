@@ -1,1 +1,38 @@
+pub module cpu_regfile #(
+    param WIDTH: u32 = 32,
+    param DEPTH: u32 = 32, // aka entries
+    param R_NUM: u32 = 2,
+    param W_NUM: u32 = 1,
+) (
+    clk: input clock,
+    rst: input reset,
 
+    i_wen   : input  logic                [W_NUM],
+    i_waddr : input  logic<$clog2(DEPTH)> [W_NUM],
+    i_wdata : input  logic       <WIDTH>  [W_NUM],
+
+    i_raddr : input  logic<$clog2(DEPTH)> [R_NUM],
+    o_rdata : output logic       <WIDTH>  [R_NUM],
+) {
+    var regs: logic<WIDTH> [DEPTH]; // assumes x0 hardwired to 0x0
+
+    always_ff (clk, rst) {
+        if_reset {
+            for j in 0..DEPTH { regs[j] = '0; }
+        }
+    }
+
+    for i in 0..W_NUM :gen_write_ports {
+        always_ff (clk) {
+
+            // TODO: consider WAW hazard protection
+            if i_wen[i] && i_waddr[i] != 0 {
+                regs[i_waddr[i]] = i_wdata[i];
+            }
+        }
+    }
+
+    for i in 0..R_NUM :gen_read_ports {
+        assign o_rdata[i] = if (i_raddr[i] != 0) ? regs[i_raddr[i]] : '0;
+    }
+}
