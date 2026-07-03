@@ -1,0 +1,49 @@
+// using PC, fetch next instruction
+// uses pc, imem
+// TODO: add adjustable mem width and buffer logic
+
+pub module cpu_stage_fetch #(
+    param XLEN       : u32 = 32,
+//  param FETCH_WIDTH: u32 = 1,
+) (
+    clk: input clock,
+    rst: input reset,
+
+    // stage controls
+    i_stall: input  logic,
+    i_flush: input  logic,
+
+    // from execute stage
+    i_pc   : input  logic<XLEN>,
+
+    // to IMEM
+    o_imem_valid: output logic,
+    i_imem_ready: input  logic,
+    i_imem_rdata: input  logic<XLEN>,
+
+    // to decode stage
+    o_valid: output logic,
+    o_pc   : output logic<XLEN>,
+    o_instr: output logic<32>,
+) {
+    var pc: logic<XLEN>;
+
+    assign o_imem_valid = 1'b1;
+
+    always_ff (clk, rst) {
+        if_reset {
+            pc      = '0;
+            o_pc    = '0;
+            o_valid = 1'b0;
+            o_instr = '0;
+        } else if i_flush { // equivilant to branch redirect
+            pc      = i_pc;
+            o_valid = 1'b0;
+        } else if !i_stall && i_imem_ready {
+            o_pc    = pc;
+            pc     += 4;
+            o_valid = 1'b1;
+            o_instr = i_imem_rdata;
+        }
+    }
+}
