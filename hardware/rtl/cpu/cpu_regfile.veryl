@@ -1,18 +1,18 @@
 pub module cpu_regfile #(
-    param WIDTH: u32 = 32,
-    param DEPTH: u32 = 32, // aka entries
-    param R_NUM: u32 = 2,
-    param W_NUM: u32 = 1,
+    param WIDTH  : u32 = 32,
+    param DEPTH  : u32 = 32, // aka entries
+    param R_PORTS: u32 = 2,
+    param W_PORTS: u32 = 1,
 ) (
     clk: input clock,
     rst: input reset,
 
-    i_wen   : input  logic                [W_NUM],
-    i_waddr : input  logic<$clog2(DEPTH)> [W_NUM],
-    i_wdata : input  logic       <WIDTH>  [W_NUM],
+    i_wen   : input  logic                [W_PORTS],
+    i_waddr : input  logic<$clog2(DEPTH)> [W_PORTS],
+    i_wdata : input  logic       <WIDTH>  [W_PORTS],
 
-    i_raddr : input  logic<$clog2(DEPTH)> [R_NUM],
-    o_rdata : output logic       <WIDTH>  [R_NUM],
+    i_raddr : input  logic<$clog2(DEPTH)> [R_PORTS],
+    o_rdata : output logic       <WIDTH>  [R_PORTS],
 ) {
     var regs: logic<WIDTH> [DEPTH]; // assumes x0 hardwired to 0x0
 
@@ -22,7 +22,7 @@ pub module cpu_regfile #(
         }
     }
 
-    for i in 0..W_NUM :gen_write_ports {
+    for i in 0..W_PORTS :gen_write_ports {
         always_ff (clk) {
 
             // TODO: consider WAW hazard protection
@@ -32,7 +32,7 @@ pub module cpu_regfile #(
         }
     }
 
-    for i in 0..R_NUM :gen_read_ports {
+    for i in 0..R_PORTS :gen_read_ports {
         assign o_rdata[i] = if (i_raddr[i] != 0) ? regs[i_raddr[i]] : '0;
     }
 }
