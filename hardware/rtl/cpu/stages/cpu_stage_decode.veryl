@@ -1,0 +1,187 @@
+// decode instruction, read register file
+// uses cpu_decoder, cpu_regfile
+
+import pkg_cpu::*;
+import pkg_cpu_alu::*;
+
+pub module cpu_stage_decode #(
+    param WIDTH: u32 = 32,
+) (
+    clk: input clock,
+    rst: input reset,
+
+    // from fetch stage
+    i_valid : input logic,
+    i_stall : input logic,
+    i_flush : input logic,
+    i_pc    : input logic<WIDTH>,
+    i_instr : input logic<32>,
+
+    // from writeback stage
+    i_wb_wen: input logic,
+    i_wb_dst: input logic<5>,
+    i_wb_val: input logic<WIDTH>,
+
+    // forwarding lines
+    // stage controls
+    o_valid : output logic,
+
+    o_pc    : output logic<WIDTH>,
+
+    // to EXE stage (ALU)
+    o_fu_op     : output AluOp,
+    o_fu_val1   : output logic<WIDTH>,
+    o_fu_val2   : output logic<WIDTH>,
+
+    // to EXE stage (BRU)
+    o_imm       : output logic<WIDTH>,
+    o_funct3    : output logic<3>,
+    o_is_branch : output logic,
+    o_is_jump   : output logic,
+
+    // forwarding lines (must thru EXE)
+    // to MEM stage (through EXE)
+    o_mem_ren   : output logic,
+    o_mem_wen   : output logic,
+    o_is_load   : output logic,
+    o_is_store  : output logic,
+    o_store_data: output logic<WIDTH>,
+
+    // to WB stage
+    o_wb_sel    : output WbSel,
+    o_rf_wen    : output logic,
+    o_rf_dst    : output logic<5>,
+
+    // to trap/control
+    o_is_illegal: output logic,
+) {
+    var dec_rf_src    : logic<5> [2];
+    var dec_rf_dst    : logic<5>;
+    var dec_rf_wen    : logic;
+    var dec_fu_op     : AluOp;
+    var dec_fu_src1   : FuSrc1;
+    var dec_fu_src2   : FuSrc2;
+    var dec_imm       : logic<WIDTH>;
+    var dec_mem_ren   : logic;
+    var dec_mem_wen   : logic;
+    var dec_wb_sel    : WbSel;
+    var dec_funct3    : logic<3>;
+    var dec_is_load   : logic;
+    var dec_is_store  : logic;
+    var dec_is_jump   : logic;
+    var dec_is_branch : logic;
+    var dec_is_illegal: logic;
+
+    inst u_decoder: cpu_decoder (
+        i_instr     : i_instr,
+        o_rf_wen    : dec_rf_wen,
+        o_rf_dst    : dec_rf_dst,
+        o_rf_src1   : dec_rf_src[0],
+        o_rf_src2   : dec_rf_src[1],
+        o_fu_op     : dec_fu_op,
+        o_fu_src1   : dec_fu_src1,
+        o_fu_src2   : dec_fu_src2,
+        o_imm       : dec_imm,
+        o_mem_ren   : dec_mem_ren,
+        o_mem_wen   : dec_mem_wen,
+        o_wb_sel    : dec_wb_sel,
+        o_funct3    : dec_funct3,
+        o_is_load   : dec_is_load,
+        o_is_store  : dec_is_store,
+        o_is_jump   : dec_is_jump,
+        o_is_branch : dec_is_branch,
+        o_is_illegal: dec_is_illegal,
+    );
+    const RF_DEPTH  : u32 = 32;
+    const RF_R_PORTS: u32 = 2;
+    const RF_W_PORTS: u32 = 1;
+
+    var rf_wen  : logic                   [RF_W_PORTS];
+    var rf_waddr: logic<$clog2(RF_DEPTH)> [RF_W_PORTS];
+    var rf_wdata: logic          <WIDTH>  [RF_W_PORTS];
+    var rf_raddr: logic<$clog2(RF_DEPTH)> [RF_R_PORTS];
+    var rf_rdata: logic          <WIDTH>  [RF_R_PORTS];
+
+    // TODO: parameterize read/write ports with EU count
+    inst u_regfile: cpu_regfile #(
+        WIDTH,
+        DEPTH  : RF_DEPTH,
+        R_PORTS: RF_R_PORTS,
+        W_PORTS: RF_W_PORTS,
+    ) (
+        clk, rst,
+        i_wen  : rf_wen,
+        i_waddr: rf_waddr,
+        i_wdata: rf_wdata,
+        i_raddr: rf_raddr,
+        o_rdata: rf_rdata,
+    );
+
+    for i in 0..RF_R_PORTS :gen_dec_to_rf_read_bridge {
+        assign rf_raddr[i] = dec_rf_src[i];
+    }
+
+    for i in 0..RF_W_PORTS :gen_dec_to_rf_write_bridge {
+        assign rf_wen[i]   = i_wb_wen;
+        assign rf_waddr[i] = i_wb_dst;
+        assign rf_wdata[i] = i_wb_val;
+    }
+
+    always_ff (clk, rst) {
+        if_reset {
+            o_valid      = 1'b0;
+            o_pc         = '0;
+            o_fu_op      = AluOp::ADD;
+            o_fu_val1    = '0;
+            o_fu_val2    = '0;
+            o_imm        = '0;
+            o_funct3     = '0;
+            o_is_branch  = 1'b0;
+            o_is_jump    = 1'b0;
+            o_mem_ren    = 1'b0;
+            o_mem_wen    = 1'b0;
+            o_is_load    = 1'b0;
+            o_is_store   = 1'b0;
+            o_store_data = '0;
+            o_wb_sel     = WbSel::NONE;
+            o_rf_wen     = 1'b0;
+            o_rf_dst     = '0;
+            o_is_illegal = 1'b0;
+        } else if i_flush {
+            o_valid      = 1'b0;
+            o_is_branch  = 1'b0;
+            o_is_jump    = 1'b0;
+            o_mem_ren    = 1'b0;
+            o_mem_wen    = 1'b0;
+            o_is_load    = 1'b0;
+            o_is_store   = 1'b0;
+            o_wb_sel     = WbSel::NONE;
+            o_rf_wen     = 1'b0;
+            o_is_illegal = 1'b0;
+        } else if !i_stall {
+            o_valid = i_valid;
+            o_pc    = i_pc;
+
+            o_fu_op = dec_fu_op;
+            o_fu_val1 = if (dec_fu_src1 == FuSrc1::PC)  ? o_pc    : rf_rdata[0];
+            o_fu_val2 = if (dec_fu_src2 == FuSrc2::IMM) ? dec_imm : rf_rdata[1];
+
+            o_imm       = dec_imm;
+            o_funct3    = dec_funct3;
+            o_is_branch = dec_is_branch;
+            o_is_jump   = dec_is_jump;
+
+            o_mem_ren    = dec_mem_ren;
+            o_mem_wen    = dec_mem_wen;
+            o_is_load    = dec_is_load;
+            o_is_store   = dec_is_store;
+            o_store_data = rf_rdata[1];
+
+            o_wb_sel = dec_wb_sel;
+            o_rf_wen = dec_rf_wen;
+            o_rf_dst = dec_rf_dst;
+
+            o_is_illegal = dec_is_illegal;
+        }
+    }
+}
