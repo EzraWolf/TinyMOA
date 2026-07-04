@@ -28,21 +28,22 @@ pub module cpu_stage_fetch #(
 ) {
     var pc: logic<XLEN>;
 
-    assign o_imem_valid = 1'b1;
-
     always_ff (clk, rst) {
         if_reset {
-            pc      = '0;
-            o_pc    = '0;
-            o_valid = 1'b0;
-            o_instr = '0;
+            pc           = '0;
+            o_pc         = '0;
+            o_imem_valid = 1'b0;
+            o_valid      = 1'b0;
+            o_instr      = '0;
         } else if i_flush { // equivilant to branch redirect
-            pc      = i_pc;
-            o_valid = 1'b0;
+            pc           = i_pc;
+            o_imem_valid = 1'b0;
+            o_valid      = 1'b0;
         } else if !i_stall && i_imem_ready {
             o_pc    = pc;
             pc     += 4;
-            o_valid = 1'b1;
+            o_imem_valid = 1'b1;
+            o_valid      = 1'b1;
             o_instr = i_imem_rdata;
         }
     }
