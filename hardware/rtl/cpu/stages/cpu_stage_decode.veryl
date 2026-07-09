@@ -45,7 +45,7 @@ pub module cpu_stage_decode #(
     o_mem_wen   : output logic,
     o_is_load   : output logic,
     o_is_store  : output logic,
-    o_store_data: output logic<WIDTH>,
+    o_store_val : output logic<WIDTH>,
 
     // to WB stage
     o_wb_sel    : output WbSel,
@@ -142,7 +142,7 @@ pub module cpu_stage_decode #(
             o_mem_wen    = 1'b0;
             o_is_load    = 1'b0;
             o_is_store   = 1'b0;
-            o_store_data = '0;
+            o_store_val  = '0;
             o_wb_sel     = WbSel::NONE;
             o_rf_wen     = 1'b0;
             o_rf_dst     = '0;
@@ -175,7 +175,7 @@ pub module cpu_stage_decode #(
             o_mem_wen    = dec_mem_wen;
             o_is_load    = dec_is_load;
             o_is_store   = dec_is_store;
-            o_store_data = rf_rdata[1];
+            o_store_val  = rf_rdata[1];
 
             o_wb_sel = dec_wb_sel;
             o_rf_wen = dec_rf_wen;
