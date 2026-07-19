@@ -1,18 +1,20 @@
 
-# General
+# general
 .DS_Store
 *.bin
 *.hex
 *.map
 *.o
 CLAUDE.md
+TODO.md
+PLAN.md
 .claude/
 .vscode/
 .idea/
 .mypy_cache/
 .temp/
 
-# Python
+# python
 __pycache__/
 *.pyc
 *.pyo
@@ -34,13 +36,14 @@ results.xml
 *.vcd
 *.ghw
 
-# Veryl
+# veryl
 .build/
 build/
 dependencies/
 target/
 *.f
 *.sv.map
+Veryl.lock
 
 # Coverage
 .coverage
