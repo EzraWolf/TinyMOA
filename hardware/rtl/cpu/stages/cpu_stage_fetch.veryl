@@ -1,50 +1,73 @@
-// using PC, fetch next instruction
-// uses pc, imem
-// TODO: add adjustable mem width and buffer logic
-
 pub module cpu_stage_fetch #(
-    param XLEN       : u32 = 32,
-//  param FETCH_WIDTH: u32 = 1,
+    param WIDTH: u32 = 32,
 ) (
     clk: input clock,
     rst: input reset,
 
-    // stage controls
-    i_stall: input  logic,
-    i_flush: input  logic,
+    i_valid     : input logic,
+    i_pc        : input logic<WIDTH>,
 
-    // from execute stage
-    i_pc   : input  logic<XLEN>,
-
-    // to IMEM
     o_imem_valid: output logic,
     i_imem_ready: input  logic,
-    i_imem_rdata: input  logic<XLEN>,
+    o_imem_addr : output logic<WIDTH>,
+    i_imem_rdata: input  logic<32>,
 
-    // to decode stage
-    o_valid: output logic,
-    o_pc   : output logic<XLEN>,
-    o_instr: output logic<32>,
+    o_valid     : output logic,
+    i_ready     : input  logic,
+    o_pc        : output logic<WIDTH>,
+    o_instr     : output logic<32>,
 ) {
-    var pc: logic<XLEN>;
+    var pc: logic<WIDTH>;
+
+    assign o_imem_valid = !o_valid || i_ready || i_valid;
+    assign o_imem_addr  = if i_valid ? i_pc : pc;
 
     always_ff (clk, rst) {
         if_reset {
-            pc           = '0;
-            o_pc         = '0;
-            o_imem_valid = 1'b0;
-            o_valid      = 1'b0;
-            o_instr      = '0;
-        } else if i_flush { // equivilant to branch redirect
-            pc           = i_pc;
-            o_imem_valid = 1'b0;
-            o_valid      = 1'b0;
-        } else if !i_stall && i_imem_ready {
-            o_pc    = pc;
-            pc     += 4;
-            o_imem_valid = 1'b1;
-            o_valid      = 1'b1;
-            o_instr = i_imem_rdata;
+            pc      = '0; // TODO: add PC_RST if needed
+            o_valid = '0;
+            o_pc    = '0;
+            o_instr = '0;
+        } else if o_imem_valid {
+            o_valid = i_imem_ready;
+
+            if i_imem_ready {
+                pc      = o_imem_addr + 4;
+                o_pc    = o_imem_addr;
+                o_instr = i_imem_rdata;
+            } else if i_valid { pc = i_pc; }
         }
     }
+}
+
+pub module dut_cpu_stage_fetch #(
+    param WIDTH: u32 = 32,
+) (
+    clk: input clock,
+    rst: input reset,
+
+    i_valid: input logic,
+    i_pc   : input logic<WIDTH>,
+
+    o_imem_valid: output logic,
+    i_imem_ready: input  logic,
+    o_imem_addr : output logic<WIDTH>,
+    i_imem_rdata: input  logic<32>,
+
+    o_valid: output logic,
+    i_ready: input  logic,
+    o_pc   : output logic<WIDTH>,
+    o_instr: output logic<32>,
+) {
+    initial {
+        $dumpfile("dut_cpu_stage_fetch.fst");
+        $dumpvars(0, dut_cpu_stage_fetch);
+    }
+
+    inst dut_cpu_stage_fetch: cpu_stage_fetch #(WIDTH) (
+        clk, rst,
+        i_valid, i_pc,
+        o_imem_valid, i_imem_ready, o_imem_addr, i_imem_rdata,
+        o_valid, i_ready, o_pc, o_instr,
+    );
 }
