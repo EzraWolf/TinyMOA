@@ -24,6 +24,10 @@ async def setup(dut):
     dut.i_valid.value = 0
     dut.i_pc.value = 0
     dut.i_instr.value = 0
+    dut.i_ex_rf_wen.value = 0
+    dut.i_ex_rf_dst.value = 0
+    dut.i_mem_rf_wen.value = 0
+    dut.i_mem_rf_dst.value = 0
     dut.i_wb_wen.value = 0
     dut.i_wb_dst.value = 0
     dut.i_wb_data.value = 0
@@ -44,6 +48,10 @@ async def _check(
     o_ready=1,
     i_pc=0,
     i_instr=0,
+    i_ex_rf_wen=0,
+    i_ex_rf_dst=0,
+    i_mem_rf_wen=0,
+    i_mem_rf_dst=0,
     i_wb_wen=0,
     i_wb_dst=0,
     i_wb_data=0,
@@ -74,6 +82,10 @@ async def _check(
     assert dut.o_ready.value == o_ready
     assert dut.i_pc.value == i_pc
     assert dut.i_instr.value == i_instr
+    assert dut.i_ex_rf_wen.value == i_ex_rf_wen
+    assert dut.i_ex_rf_dst.value == i_ex_rf_dst
+    assert dut.i_mem_rf_wen.value == i_mem_rf_wen
+    assert dut.i_mem_rf_dst.value == i_mem_rf_dst
     assert dut.i_wb_wen.value == i_wb_wen
     assert dut.i_wb_dst.value == i_wb_dst
     assert dut.i_wb_data.value == i_wb_data
@@ -116,6 +128,8 @@ async def proper_io_widths(dut):
 
     addr_width = (DEPTH - 1).bit_length()
     assert WIDTH == len(dut.i_pc)
+    assert addr_width == len(dut.i_ex_rf_dst)
+    assert addr_width == len(dut.i_mem_rf_dst)
     assert addr_width == len(dut.i_wb_dst)
     assert WIDTH == len(dut.i_wb_data)
     assert WIDTH == len(dut.o_pc)
@@ -500,6 +514,96 @@ async def hold_on_backpressure(dut):
         o_valid=1,
         o_pc=8,
         o_fu_op=AluOp.SUB,
+        o_wb_sel=WbSel.FU,
+        o_rf_wen=1,
+        o_rf_dst=2,
+    )
+
+
+@cocotb.test()
+async def stall_on_raw_hazard(dut):
+    await setup(dut)
+
+    producer = rv32i.encode_addi(1, 0, 1)
+    consumer = rv32i.encode_add(2, 1, 0)
+    dut.i_valid.value = 1
+    dut.i_ready.value = 1
+    dut.i_instr.value = producer
+    await FallingEdge(dut.clk)
+
+    dut.i_instr.value = consumer
+    await _check(
+        dut,
+        i_valid=1,
+        i_ready=1,
+        o_ready=0,
+        i_instr=consumer,
+        o_valid=1,
+        o_fu_data2=1,
+        o_imm=1,
+        o_wb_sel=WbSel.FU,
+        o_rf_wen=1,
+        o_rf_dst=1,
+    )
+    await FallingEdge(dut.clk)
+    await _check(
+        dut,
+        i_valid=1,
+        i_ready=1,
+        i_instr=consumer,
+        o_fu_data2=1,
+        o_imm=1,
+        o_wb_sel=WbSel.FU,
+        o_rf_wen=1,
+        o_rf_dst=1,
+    )
+
+    dut.i_ex_rf_wen.value = 1
+    dut.i_ex_rf_dst.value = 1
+    await _check(
+        dut,
+        i_valid=1,
+        i_ready=1,
+        o_ready=0,
+        i_instr=consumer,
+        i_ex_rf_wen=1,
+        i_ex_rf_dst=1,
+        o_fu_data2=1,
+        o_imm=1,
+        o_wb_sel=WbSel.FU,
+        o_rf_wen=1,
+        o_rf_dst=1,
+    )
+
+    dut.i_ex_rf_wen.value = 0
+    dut.i_ex_rf_dst.value = 0
+    dut.i_mem_rf_wen.value = 1
+    dut.i_mem_rf_dst.value = 1
+    await _check(
+        dut,
+        i_valid=1,
+        i_ready=1,
+        o_ready=0,
+        i_instr=consumer,
+        i_mem_rf_wen=1,
+        i_mem_rf_dst=1,
+        o_fu_data2=1,
+        o_imm=1,
+        o_wb_sel=WbSel.FU,
+        o_rf_wen=1,
+        o_rf_dst=1,
+    )
+
+    dut.i_mem_rf_wen.value = 0
+    dut.i_mem_rf_dst.value = 0
+    await FallingEdge(dut.clk)
+    await _check(
+        dut,
+        i_valid=1,
+        i_ready=1,
+        i_instr=consumer,
+        o_valid=1,
+        o_fu_op=AluOp.ADD,
         o_wb_sel=WbSel.FU,
         o_rf_wen=1,
         o_rf_dst=2,

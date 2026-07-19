@@ -9,7 +9,14 @@ from xml.etree import ElementTree as ET
 from cocotb_tools.runner import get_runner
 
 
-def run(block: str, dut: str, src: list[str], test_name: str = "", params: dict = {}):
+def run(
+    block: str,
+    dut: str,
+    src: list[str],
+    test_name: str = "",
+    params: dict = {},
+    kind: str = "unit",
+):
     PRJ_DIR = Path(__file__).parents[2].resolve()
     test = "_".join(filter(None, (block, dut, test_name)))
     SIM_DIR = (
@@ -28,7 +35,7 @@ def run(block: str, dut: str, src: list[str], test_name: str = "", params: dict 
     assert SRC_DIR
 
     toplevel = f"tinymoa_{block}_{dut}"
-    module = f"tests.unit.{block}.test_{test}"
+    module = f"tests.{kind}.{block}.test_{test}"
     sources = [
         str(((SRC_DIR if s.startswith("~") else PRJ_DIR) / s.removeprefix("~")))
         for s in src

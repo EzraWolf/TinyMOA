@@ -14,6 +14,11 @@ pub module cpu_stage_decode #(
     i_pc        : input  logic<WIDTH>,
     i_instr     : input  logic<32>,
 
+    i_ex_rf_wen : input logic,
+    i_ex_rf_dst : input logic<$clog2(DEPTH)>,
+    i_mem_rf_wen: input logic,
+    i_mem_rf_dst: input logic<$clog2(DEPTH)>,
+
     i_wb_wen    : input  logic,
     i_wb_dst    : input  logic<$clog2(DEPTH)>,
     i_wb_data   : input  logic<WIDTH>,
@@ -65,8 +70,10 @@ pub module cpu_stage_decode #(
     var dec_is_ecall  : logic;
     var dec_is_ebreak : logic;
     var dec_is_illegal: logic;
+    var hazard        : logic;
 
     let ext_imm: logic<WIDTH> = {dec_imm[msb] repeat WIDTH - 32, dec_imm};
+    let output_ready: logic = !o_valid || i_ready;
 
     inst u_decoder: cpu_decoder (
         i_instr,
@@ -120,7 +127,24 @@ pub module cpu_stage_decode #(
         assign rf_wdata[i] = i_wb_data;
     }
 
-    assign o_ready = !o_valid || i_ready || i_flush;
+    always_comb {
+        hazard = 1'b0;
+        for i in 0..RF_R_PORTS {
+            if i_valid && dec_rf_src[i] != 0 {
+                if o_valid && o_rf_wen && o_rf_dst == dec_rf_src[i][$clog2(DEPTH) - 1:0] {
+                    hazard = 1'b1;
+                }
+                if i_ex_rf_wen && i_ex_rf_dst == dec_rf_src[i][$clog2(DEPTH) - 1:0] {
+                    hazard = 1'b1;
+                }
+                if i_mem_rf_wen && i_mem_rf_dst == dec_rf_src[i][$clog2(DEPTH) - 1:0] {
+                    hazard = 1'b1;
+                }
+            }
+        }
+    }
+
+    assign o_ready = i_flush || (output_ready && !hazard);
 
     always_ff (clk, rst) {
         if_reset {
@@ -145,26 +169,29 @@ pub module cpu_stage_decode #(
             o_rf_dst     = '0;
         } else if i_flush {
             o_valid = 1'b0;
-        } else if o_ready {
-            o_valid      = i_valid;
-            o_pc         = i_pc;
-            o_fu_op      = dec_fu_op;
-            o_fu_data1   = if (dec_fu_src1 == FuSrc1::PC)  ? i_pc    : rf_rdata[0];
-            o_fu_data2   = if (dec_fu_src2 == FuSrc2::IMM) ? ext_imm : rf_rdata[1];
-            o_imm        = ext_imm;
-            o_funct3     = dec_funct3;
-            o_is_branch  = dec_is_branch;
-            o_is_jump    = dec_is_jump;
-            o_is_fence   = dec_is_fence;
-            o_is_ecall   = dec_is_ecall;
-            o_is_ebreak  = dec_is_ebreak;
-            o_is_illegal = dec_is_illegal;
-            o_mem_ren    = dec_mem_ren;
-            o_mem_wen    = dec_mem_wen;
-            o_store_data = rf_rdata[1];
-            o_wb_sel     = dec_wb_sel;
-            o_rf_wen     = dec_rf_wen;
-            o_rf_dst     = dec_rf_dst[$clog2(DEPTH) - 1:0];
+        } else if output_ready {
+            o_valid = 1'b0;
+            if !hazard {
+                o_valid      = i_valid;
+                o_pc         = i_pc;
+                o_fu_op      = dec_fu_op;
+                o_fu_data1   = if (dec_fu_src1 == FuSrc1::PC)  ? i_pc    : rf_rdata[0];
+                o_fu_data2   = if (dec_fu_src2 == FuSrc2::IMM) ? ext_imm : rf_rdata[1];
+                o_imm        = ext_imm;
+                o_funct3     = dec_funct3;
+                o_is_branch  = dec_is_branch;
+                o_is_jump    = dec_is_jump;
+                o_is_fence   = dec_is_fence;
+                o_is_ecall   = dec_is_ecall;
+                o_is_ebreak  = dec_is_ebreak;
+                o_is_illegal = dec_is_illegal;
+                o_mem_ren    = dec_mem_ren;
+                o_mem_wen    = dec_mem_wen;
+                o_store_data = rf_rdata[1];
+                o_wb_sel     = dec_wb_sel;
+                o_rf_wen     = dec_rf_wen;
+                o_rf_dst     = dec_rf_dst[$clog2(DEPTH) - 1:0];
+            }
         }
     }
 }
