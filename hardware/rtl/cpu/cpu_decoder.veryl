@@ -41,8 +41,8 @@ pub module cpu_decoder (
     let op    : logic<5>  = i_instr[6:2];
     let quad  : logic<2>  = i_instr[1:0];
 
-    assign o_rf_src1 = if (o_fu_src1 != FuSrc1::NONE) ? rs1 : 5'b0;
-    assign o_rf_src2 = if (o_fu_src2 != FuSrc2::NONE) ? rs2 : 5'b0;
+    assign o_rf_src1 = if (o_fu_src1 == FuSrc1::REG) ? rs1 : 5'b0;
+    assign o_rf_src2 = if (o_fu_src2 == FuSrc2::REG || o_is_store) ? rs2 : 5'b0;
     assign o_rf_dst  = if (o_wb_sel  != WbSel::NONE ) ? rd  : 5'b0;
     assign o_rf_wen  = o_wb_sel      != WbSel::NONE;
     assign o_mem_ren = o_is_load     == 1'b1 || o_wb_sel == WbSel::MEM;
@@ -53,9 +53,7 @@ pub module cpu_decoder (
         o_fu_src1    = FuSrc1::NONE;
         o_fu_src2    = FuSrc2::NONE;
         o_imm        = 32'b0;
-
         o_wb_sel     = WbSel::NONE;
-
         o_funct3     = 3'b0;
         o_is_load    = 1'b0;
         o_is_store   = 1'b0;
@@ -70,7 +68,7 @@ pub module cpu_decoder (
             2'b11: { // full RV32I/RV64I/RV128I
                 o_fu_src1 = FuSrc1::REG;
                 o_fu_src2 = FuSrc2::REG;
-                o_wb_sel  = WbSel::ALU;
+                o_wb_sel  = WbSel::FU;
                 o_funct3  = funct3;
 
                 case op {
@@ -164,7 +162,7 @@ pub module cpu_decoder (
                         // TODO: assign at rename, skip backend (ALU) altogether
                         o_fu_src1 = if op[3] == 1'b0 ? FuSrc1::PC : FuSrc1::NONE; // AUIPC:LUI
                         o_fu_src2 = FuSrc2::IMM;
-                        o_wb_sel  = WbSel::ALU;
+                        o_wb_sel  = WbSel::FU;
                         o_imm     = imm_u;
                     }
                     // 5'b11100: {} // TODO: system

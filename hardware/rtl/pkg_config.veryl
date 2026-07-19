@@ -32,12 +32,12 @@ pub package pkg_cpu {
 
     const ALU_W_OP_EN: bbool = pkg_soc::XLEN >= 32; // *W ops for 64/128-bit ISA
 
-    // multiplex ALU inputs
+    // multiplex FU inputs
     enum FuSrc1: logic<2> { NONE, REG,  PC   }
     enum FuSrc2: logic<2> { NONE, REG,  IMM  }
 
     // result mux is actually only 3:1, NONE treated as `REG; reg_wen = 0`
-    enum WbSel: logic<2> { NONE, ALU, PC, MEM }
+    enum WbSel: logic<2> { NONE, FU, PC, MEM }
 
     // CPU frontend
     const USE_BPU: bbool = true;
@@ -50,7 +50,7 @@ pub package pkg_cpu {
     const REGFILE_FP_NUM  : u32 = 96;
     const REGFILE_VEC_NUML: u32 = 96;
 
-    // CPU backend execution units (EUs)
+    // CPU backend functional units (FUs)
     const ALU_NUM: u32 = 4;
     const FPU_NUM: u32 = 2;
     const VPU_NUM: u32 = 2;
