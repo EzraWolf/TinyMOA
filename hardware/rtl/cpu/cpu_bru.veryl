@@ -1,15 +1,16 @@
-// branch resolution unit (BRU)
-// currently setup for in-order. OoO has similar interface but becomes backend EU
-pub module cpu_bru (
+// currently setup for in-order. OoO has similar interface but becomes backend FU
+pub module cpu_bru #(
+    param WIDTH: u32 = 32,
+) (
     i_valid   : input  logic,
     i_op      : input  logic<3>, // funct3
-    i_pc      : input  logic<32>,
-    i_rs1_data: input  logic<32>,
-    i_rs2_data: input  logic<32>,
-    i_imm     : input  logic<32>,
+    i_pc      : input  logic<WIDTH>,
+    i_rs1_data: input  logic<WIDTH>,
+    i_rs2_data: input  logic<WIDTH>,
+    i_imm     : input  logic<WIDTH>,
 
     o_taken   : output logic,
-    o_pc      : output logic<32>,
+    o_pc      : output logic<WIDTH>,
 ) {
     let eq : logic = i_rs1_data == i_rs2_data;
     let lt : logic = $signed(i_rs1_data) <: $signed(i_rs2_data);
