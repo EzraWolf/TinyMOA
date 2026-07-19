@@ -67,6 +67,7 @@ def run(
             build_dir=str(SIM_DIR),
             test_dir=str(SIM_DIR),
             log_file=str(SIM_DIR / "test.log"),
+            # waves=True,
             extra_env={k: str(v) for k, v in params.items()},
         )
     except SystemExit:
