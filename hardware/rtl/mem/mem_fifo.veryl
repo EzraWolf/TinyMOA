@@ -1,16 +1,14 @@
-// Simple FIFO
-
 pub module mem_fifo #(
-    param WIDTH: u32 = 64 ,
+    param WIDTH: u32 = 64,
     param DEPTH: u32 = 128,
 ) (
     clk: input clock,
     rst: input reset,
 
-    i_wen  : input logic,
+    i_wen  : input  logic,
     i_data : input  logic<WIDTH>,
 
-    i_ren  :  input logic,    
+    i_ren  : input  logic,    
     o_data : output logic<WIDTH>,
 
     o_full : output logic,
@@ -51,6 +49,7 @@ pub module mem_fifo #(
         }
     }
 
+    // control
     always_ff (clk, rst) {
         if_reset {
             is_read = 1'b1;
