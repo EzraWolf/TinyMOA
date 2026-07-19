@@ -7,12 +7,12 @@ mapper="-abc9"
 flags=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --no-bram) flags="$flags -nobram" ;;
-        --no-dsp)  flags="$flags -nodsp" ;;
-        --flatten) flags="$flags -flatten" ;;
-        --retime)  mapper="-retime" ;;
+        -nb|--no-bram) flags="$flags -nobram" ;;
+        -nd|--no-dsp)  flags="$flags -nodsp" ;;
+        -f|--flatten)  flags="$flags -flatten" ;;
+        -r|--retime)   mapper="-retime" ;;
         *)
-            echo "usage: $0 [--no-bram] [--no-dsp] [--flatten] [--retime]" >&2
+            echo "usage: $0 [-nb|--no-bram] [-nd|--no-dsp] [-f|--flatten] [-r|--retime]" >&2
             exit 2
             ;;
     esac
@@ -21,7 +21,13 @@ done
 
 log="$(mktemp)"
 report="$(mktemp)"
-trap 'rm -f "$log" "$report"' EXIT
+check_log="$(mktemp)"
+trap 'rm -f "$log" "$report" "$check_log"' EXIT
+
+check_status=0
+veryl check >"$check_log" 2>&1 || check_status=$?
+sed '/^\[INFO \]/d' "$check_log"
+[ "$check_status" -eq 0 ] || exit "$check_status"
 
 veryl build --quiet
 
