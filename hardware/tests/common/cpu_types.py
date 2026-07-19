@@ -36,3 +36,11 @@ class WbSel(IntEnum):
     FU = 1
     PC = 2
     MEM = 3
+
+
+class MemOp(IntEnum):
+    BYTE = 0b000
+    HALF = 0b001
+    WORD = 0b010
+    BYTE_U = 0b100
+    HALF_U = 0b101
