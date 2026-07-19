@@ -312,6 +312,6 @@ def test_ecore_alu(p):
     run(
         "ecore",
         "alu",
-        ["~ecore/ecore_alu.sv", "~ecore/pkgs/ecore_pkg_alu.sv"],
+        ["~ecore/pkgs/ecore_pkg_alu.sv", "~ecore/ecore_alu.sv"],
         params=p,
     )

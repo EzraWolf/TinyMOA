@@ -96,7 +96,7 @@ def test_ecore_top_fibonacci(p):
         "ecore",
         "top",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/pkgs/ecore_pkg_alu.sv",
             "~ecore/ecore_alu.sv",
             "~ecore/ecore_bru.sv",

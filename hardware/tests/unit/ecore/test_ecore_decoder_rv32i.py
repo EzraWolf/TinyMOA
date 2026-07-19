@@ -555,7 +555,7 @@ def test_ecore_decoder_rv32i():
         "ecore",
         "decoder",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/pkgs/ecore_pkg_alu.sv",
             "~ecore/ecore_decoder.sv",
         ],

@@ -1,4 +1,4 @@
-import ecore_pkg_cpu::*;
+import ecore_pkg_cfg::*;
 import ecore_pkg_alu::*;
 
 pub module ecore_top #(

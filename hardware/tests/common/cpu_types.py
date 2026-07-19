@@ -33,9 +33,9 @@ class FuSrc2(IntEnum):
 
 class WbSel(IntEnum):
     NONE = 0
-    FU = 1
-    PC = 2
-    MEM = 3
+    MEM = 1
+    FU = 2
+    PC = 3
 
 
 class MemOp(IntEnum):
