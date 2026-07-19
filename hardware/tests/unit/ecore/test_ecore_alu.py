@@ -308,5 +308,10 @@ async def sraw_sign(dut):
         {"WIDTH": 128},
     ],
 )
-def test_cpu_alu(p):
-    run("cpu", "alu", ["~cpu/cpu_alu.sv", "~cpu/pkgs/pkg_cpu_alu.sv"], params=p)
+def test_ecore_alu(p):
+    run(
+        "ecore",
+        "alu",
+        ["~ecore/ecore_alu.sv", "~ecore/pkgs/ecore_pkg_alu.sv"],
+        params=p,
+    )

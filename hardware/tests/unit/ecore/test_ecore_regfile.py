@@ -197,5 +197,5 @@ async def reset_clears(dut):
         {"WIDTH": 64, "DEPTH": 32, "R_PORTS": 4, "W_PORTS": 2},
     ],
 )
-def test_cpu_regfile(p):
-    run("cpu", "regfile", ["~cpu/cpu_regfile.sv"], params=p)
+def test_ecore_regfile(p):
+    run("ecore", "regfile", ["~ecore/ecore_regfile.sv"], params=p)

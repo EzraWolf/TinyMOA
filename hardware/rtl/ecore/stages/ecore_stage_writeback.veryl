@@ -1,6 +1,6 @@
-import pkg_cpu::*;
+import ecore_pkg_cpu::*;
 
-pub module cpu_stage_writeback #(
+pub module ecore_stage_writeback #(
     param WIDTH: u32 = 32,
     param DEPTH: u32 = 32,
 ) (

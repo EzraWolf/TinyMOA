@@ -339,13 +339,13 @@ async def one_ipc(dut):
         {"WIDTH": 64, "DEPTH": 32},
     ],
 )
-def test_cpu_stage_writeback(p):
+def test_ecore_stage_writeback(p):
     run(
-        "cpu",
+        "ecore",
         "stage_writeback",
         [
-            "~pkg_config.sv",
-            "~cpu/stages/cpu_stage_writeback.sv",
+            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/stages/ecore_stage_writeback.sv",
         ],
         params=p,
     )

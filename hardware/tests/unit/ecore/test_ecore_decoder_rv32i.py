@@ -550,10 +550,14 @@ async def illegal_system(dut):
         await _check(dut, i_instr=instr, o_funct3=funct3, o_is_illegal=1)
 
 
-def test_cpu_decoder_rv32i():
+def test_ecore_decoder_rv32i():
     run(
-        "cpu",
+        "ecore",
         "decoder",
-        ["~pkg_config.sv", "~cpu/pkgs/pkg_cpu_alu.sv", "~cpu/cpu_decoder.sv"],
+        [
+            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_alu.sv",
+            "~ecore/ecore_decoder.sv",
+        ],
         test_name="rv32i",
     )

@@ -1,7 +1,7 @@
-import pkg_cpu::*;
-import pkg_cpu_alu::*;
+import ecore_pkg_cpu::*;
+import ecore_pkg_alu::*;
 
-pub module cpu_stage_decode #(
+pub module ecore_stage_decode #(
     param WIDTH: u32 = 32,
     param DEPTH: u32 = 32,
 ) (
@@ -75,7 +75,7 @@ pub module cpu_stage_decode #(
     let ext_imm: logic<WIDTH> = {dec_imm[msb] repeat WIDTH - 32, dec_imm};
     let output_ready: logic = !o_valid || i_ready;
 
-    inst u_decoder: cpu_decoder (
+    inst u_decoder: ecore_decoder (
         i_instr,
         o_rf_wen    : dec_rf_wen,
         o_rf_dst    : dec_rf_dst,
@@ -104,7 +104,7 @@ pub module cpu_stage_decode #(
     var rf_raddr: logic<$clog2(DEPTH)> [RF_R_PORTS];
     var rf_rdata: logic       <WIDTH>  [RF_R_PORTS];
 
-    inst u_regfile: cpu_regfile #(
+    inst u_regfile: ecore_regfile #(
         WIDTH,
         DEPTH,
         R_PORTS: RF_R_PORTS,

@@ -524,16 +524,16 @@ async def flush_drops_output(dut):
         {"WIDTH": 64, "DEPTH": 32},
     ],
 )
-def test_cpu_stage_execute(p):
+def test_ecore_stage_execute(p):
     run(
-        "cpu",
+        "ecore",
         "stage_execute",
         [
-            "~pkg_config.sv",
-            "~cpu/pkgs/pkg_cpu_alu.sv",
-            "~cpu/cpu_alu.sv",
-            "~cpu/cpu_bru.sv",
-            "~cpu/stages/cpu_stage_execute.sv",
+            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_alu.sv",
+            "~ecore/ecore_alu.sv",
+            "~ecore/ecore_bru.sv",
+            "~ecore/stages/ecore_stage_execute.sv",
         ],
         params=p,
     )

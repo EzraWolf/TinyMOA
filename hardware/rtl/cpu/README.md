@@ -1,3 +1,0 @@
-# RISC-V CPU
-
-WIP

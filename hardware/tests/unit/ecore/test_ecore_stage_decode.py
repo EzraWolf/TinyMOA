@@ -654,16 +654,16 @@ async def flush(dut):
         {"WIDTH": 64, "DEPTH": 32},
     ],
 )
-def test_cpu_stage_decode(p):
+def test_ecore_stage_decode(p):
     run(
-        "cpu",
+        "ecore",
         "stage_decode",
         [
-            "~pkg_config.sv",
-            "~cpu/pkgs/pkg_cpu_alu.sv",
-            "~cpu/cpu_decoder.sv",
-            "~cpu/cpu_regfile.sv",
-            "~cpu/stages/cpu_stage_decode.sv",
+            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_alu.sv",
+            "~ecore/ecore_decoder.sv",
+            "~ecore/ecore_regfile.sv",
+            "~ecore/stages/ecore_stage_decode.sv",
         ],
         params=p,
     )

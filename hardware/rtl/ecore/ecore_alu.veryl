@@ -1,9 +1,9 @@
-import pkg_cpu_alu::*;
+import ecore_pkg_alu::*;
 
-pub module cpu_alu #(
-    param WIDTH: u32 = 64,
+pub module ecore_alu #(
+    param WIDTH: u32 = 32,
 ) (
-    i_op: input pkg_cpu_alu::AluOp,
+    i_op: input ecore_pkg_alu::AluOp,
 
     i_a: input logic<WIDTH>,
     i_b: input logic<WIDTH>,

@@ -1,5 +1,4 @@
-// currently setup for in-order. OoO has similar interface but becomes backend FU
-pub module cpu_bru #(
+pub module ecore_bru #(
     param WIDTH: u32 = 32,
 ) (
     i_valid   : input  logic,

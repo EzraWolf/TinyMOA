@@ -297,5 +297,5 @@ async def invalid_op_reports_error(dut):
 
 
 @pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
-def test_cpu_lsu(p):
-    run("cpu", "lsu", ["~cpu/cpu_lsu.sv"], params=p)
+def test_ecore_lsu(p):
+    run("ecore", "lsu", ["~ecore/ecore_lsu.sv"], params=p)

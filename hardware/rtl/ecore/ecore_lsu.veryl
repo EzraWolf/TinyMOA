@@ -1,4 +1,4 @@
-pub module cpu_lsu #(
+pub module ecore_lsu #(
     param WIDTH: u32 = 32,
 ) (
     i_addr      : input  logic<WIDTH>,

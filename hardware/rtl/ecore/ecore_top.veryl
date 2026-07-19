@@ -1,7 +1,7 @@
-import pkg_cpu::*;
-import pkg_cpu_alu::*;
+import ecore_pkg_cpu::*;
+import ecore_pkg_alu::*;
 
-pub module cpu_top #(
+pub module ecore_top #(
     param WIDTH: u32 = 32,
     param DEPTH: u32 = 32,
 ) (
@@ -92,7 +92,7 @@ pub module cpu_top #(
     var writeback_rf_dst : logic<$clog2(DEPTH)>;
     var writeback_rf_data: logic<WIDTH>;
 
-    inst u_fetch: cpu_stage_fetch #(WIDTH) (
+    inst u_fetch: ecore_stage_fetch #(WIDTH) (
         clk, rst,
         i_valid     : redirect_valid,
         i_pc        : redirect_pc,
@@ -106,7 +106,7 @@ pub module cpu_top #(
         o_instr     : fetch_instr,
     );
 
-    inst u_decode: cpu_stage_decode #(WIDTH, DEPTH) (
+    inst u_decode: ecore_stage_decode #(WIDTH, DEPTH) (
         clk, rst,
         i_flush     : redirect_valid,
         i_valid     : fetch_valid,
@@ -142,7 +142,7 @@ pub module cpu_top #(
         o_rf_dst    : decode_rf_dst,
     );
 
-    inst u_execute: cpu_stage_execute #(WIDTH, DEPTH) (
+    inst u_execute: ecore_stage_execute #(WIDTH, DEPTH) (
         clk, rst,
         i_flush     : 1'b0,
         i_valid     : decode_valid && !redirect_valid,
@@ -184,7 +184,7 @@ pub module cpu_top #(
         o_redirect_pc   : redirect_pc,
     );
 
-    inst u_memory: cpu_stage_memory #(WIDTH, DEPTH) (
+    inst u_memory: ecore_stage_memory #(WIDTH, DEPTH) (
         clk, rst,
         i_flush     : 1'b0,
         i_valid     : execute_valid,
@@ -225,7 +225,7 @@ pub module cpu_top #(
         o_rf_dst    : memory_rf_dst,
     );
 
-    inst u_writeback: cpu_stage_writeback #(WIDTH, DEPTH) (
+    inst u_writeback: ecore_stage_writeback #(WIDTH, DEPTH) (
         i_valid     : memory_valid,
         o_ready     : memory_ready,
         i_pc        : memory_pc,

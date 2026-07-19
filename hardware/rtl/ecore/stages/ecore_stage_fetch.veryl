@@ -1,4 +1,4 @@
-pub module cpu_stage_fetch #(
+pub module ecore_stage_fetch #(
     param WIDTH: u32 = 32,
 ) (
     clk: input clock,
@@ -38,36 +38,4 @@ pub module cpu_stage_fetch #(
             } else if i_valid { pc = i_pc; }
         }
     }
-}
-
-pub module dut_cpu_stage_fetch #(
-    param WIDTH: u32 = 32,
-) (
-    clk: input clock,
-    rst: input reset,
-
-    i_valid: input logic,
-    i_pc   : input logic<WIDTH>,
-
-    o_imem_valid: output logic,
-    i_imem_ready: input  logic,
-    o_imem_addr : output logic<WIDTH>,
-    i_imem_rdata: input  logic<32>,
-
-    o_valid: output logic,
-    i_ready: input  logic,
-    o_pc   : output logic<WIDTH>,
-    o_instr: output logic<32>,
-) {
-    initial {
-        $dumpfile("dut_cpu_stage_fetch.fst");
-        $dumpvars(0, dut_cpu_stage_fetch);
-    }
-
-    inst dut_cpu_stage_fetch: cpu_stage_fetch #(WIDTH) (
-        clk, rst,
-        i_valid, i_pc,
-        o_imem_valid, i_imem_ready, o_imem_addr, i_imem_rdata,
-        o_valid, i_ready, o_pc, o_instr,
-    );
 }

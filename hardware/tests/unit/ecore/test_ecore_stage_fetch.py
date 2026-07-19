@@ -203,5 +203,5 @@ async def redirect_flush(dut):
 
 
 @pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
-def test_cpu_stage_fetch(p):
-    run("cpu", "stage_fetch", ["~cpu/stages/cpu_stage_fetch.sv"], params=p)
+def test_ecore_stage_fetch(p):
+    run("ecore", "stage_fetch", ["~ecore/stages/ecore_stage_fetch.sv"], params=p)

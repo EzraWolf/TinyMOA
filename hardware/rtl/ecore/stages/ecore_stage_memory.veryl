@@ -1,6 +1,6 @@
-import pkg_cpu::*;
+import ecore_pkg_cpu::*;
 
-pub module cpu_stage_memory #(
+pub module ecore_stage_memory #(
     param WIDTH: u32 = 32,
     param DEPTH: u32 = 32,
 ) (
@@ -59,7 +59,7 @@ pub module cpu_stage_memory #(
     let output_ready : logic = !o_valid || i_ready;
     let mem_access   : logic = i_mem_ren || i_mem_wen;
 
-    inst u_lsu: cpu_lsu #(WIDTH) (
+    inst u_lsu: ecore_lsu #(WIDTH) (
         i_addr      : i_fu_data,
         i_store_data,
         i_op        : i_funct3,

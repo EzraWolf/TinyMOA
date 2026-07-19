@@ -228,5 +228,5 @@ async def invalid_input_not_taken(dut):
 
 
 @pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
-def test_cpu_bru(p):
-    run("cpu", "bru", ["~cpu/cpu_bru.sv"], params=p)
+def test_ecore_bru(p):
+    run("ecore", "bru", ["~ecore/ecore_bru.sv"], params=p)

@@ -1,12 +1,7 @@
+// configure the entire CPU here
 
-// All parameters to configure TinyMOA live here
-
-pub package pkg_soc {
+pub package ecore_pkg_cpu {
     const XLEN: u32 = 32; // 32 or 64 ONLY!!
-}
-
-pub package pkg_cpu {
-    import pkg_soc::*;
 
     // CPU always enabled
     const USE_LINUX: bbool = true;
@@ -27,10 +22,10 @@ pub package pkg_cpu {
     // const USE_EXT_LPU     : bbool = pkg_lpu::LPU_EN; // custom LPU ISA
 
     // required linux MMUs, let params auto set
-    const USE_MMU_Sv32: bbool = USE_LINUX && (pkg_soc::XLEN == 32);
-    const USE_MMU_Sv39: bbool = USE_LINUX && (pkg_soc::XLEN == 64);
+    const USE_MMU_Sv32: bbool = USE_LINUX && (XLEN == 32);
+    const USE_MMU_Sv39: bbool = USE_LINUX && (XLEN == 64);
 
-    const ALU_W_OP_EN: bbool = pkg_soc::XLEN >= 32; // *W ops for 64/128-bit ISA
+    const ALU_W_OP_EN : bbool = XLEN >= 32; // *W ops for 64/128-bit ISA
 
     // multiplex FU inputs
     enum FuSrc1: logic<2> { NONE, REG,  PC   }
@@ -57,7 +52,7 @@ pub package pkg_cpu {
     const AGU_NUM: u32 = 2;
 }
 
-pub package pkg_lpu {
+pub package pkg_ecore_lpu {
     const LPU_EN: bbool = true;
 
     const CIM_DIM    : u32 = 32; // NxN corelet array

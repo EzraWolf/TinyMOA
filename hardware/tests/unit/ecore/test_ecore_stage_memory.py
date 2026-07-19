@@ -631,14 +631,14 @@ async def flush_cancels_waiting_access(dut):
         {"WIDTH": 64, "DEPTH": 32},
     ],
 )
-def test_cpu_stage_memory(p):
+def test_ecore_stage_memory(p):
     run(
-        "cpu",
+        "ecore",
         "stage_memory",
         [
-            "~pkg_config.sv",
-            "~cpu/cpu_lsu.sv",
-            "~cpu/stages/cpu_stage_memory.sv",
+            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/ecore_lsu.sv",
+            "~ecore/stages/ecore_stage_memory.sv",
         ],
         params=p,
     )

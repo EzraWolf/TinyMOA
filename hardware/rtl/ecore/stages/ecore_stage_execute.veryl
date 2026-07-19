@@ -1,7 +1,7 @@
-import pkg_cpu::*;
-import pkg_cpu_alu::*;
+import ecore_pkg_cpu::*;
+import ecore_pkg_alu::*;
 
-pub module cpu_stage_execute #(
+pub module ecore_stage_execute #(
     param WIDTH: u32 = 32,
     param DEPTH: u32 = 32,
 ) (
@@ -60,14 +60,14 @@ pub module cpu_stage_execute #(
     var branch_pc   : logic<WIDTH>;
     var branch_taken: logic;
 
-    inst u_alu: cpu_alu #(WIDTH) (
+    inst u_alu: ecore_alu #(WIDTH) (
         i_op : i_fu_op,
         i_a  : i_fu_data1,
         i_b  : i_fu_data2,
         o_res: fu_data,
     );
 
-    inst u_bru: cpu_bru #(WIDTH) (
+    inst u_bru: ecore_bru #(WIDTH) (
         i_valid   : i_valid && i_is_branch,
         i_op      : i_funct3,
         i_pc,

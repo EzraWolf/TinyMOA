@@ -1,3 +1,4 @@
+import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, Timer
@@ -83,26 +84,33 @@ async def fibonacci(dut):
     assert data_mem.get(RESULT_ADDR, 0) == RESULT
 
 
-def test_cpu_top_fibonacci():
+@pytest.mark.parametrize(
+    "p",
+    [
+        {"WIDTH": 32, "DEPTH": 32},
+        {"WIDTH": 64, "DEPTH": 32},
+    ],
+)
+def test_ecore_top_fibonacci(p):
     run(
-        "cpu",
+        "ecore",
         "top",
         [
-            "~pkg_config.sv",
-            "~cpu/pkgs/pkg_cpu_alu.sv",
-            "~cpu/cpu_alu.sv",
-            "~cpu/cpu_bru.sv",
-            "~cpu/cpu_decoder.sv",
-            "~cpu/cpu_regfile.sv",
-            "~cpu/cpu_lsu.sv",
-            "~cpu/stages/cpu_stage_fetch.sv",
-            "~cpu/stages/cpu_stage_decode.sv",
-            "~cpu/stages/cpu_stage_execute.sv",
-            "~cpu/stages/cpu_stage_memory.sv",
-            "~cpu/stages/cpu_stage_writeback.sv",
-            "~cpu/cpu_top.sv",
+            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_alu.sv",
+            "~ecore/ecore_alu.sv",
+            "~ecore/ecore_bru.sv",
+            "~ecore/ecore_decoder.sv",
+            "~ecore/ecore_regfile.sv",
+            "~ecore/ecore_lsu.sv",
+            "~ecore/stages/ecore_stage_fetch.sv",
+            "~ecore/stages/ecore_stage_decode.sv",
+            "~ecore/stages/ecore_stage_execute.sv",
+            "~ecore/stages/ecore_stage_memory.sv",
+            "~ecore/stages/ecore_stage_writeback.sv",
+            "~ecore/ecore_top.sv",
         ],
         test_name="fibonacci",
-        params={"WIDTH": 32, "DEPTH": 32},
+        params=p,
         kind="integration",
     )

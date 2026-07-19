@@ -1,8 +1,7 @@
-// RV32I decoder. soon to be RV32I/RV64I + optional MAFC_Zicsr_Zifencei_BF16
-import pkg_cpu::*;
-import pkg_cpu_alu::*;
+import ecore_pkg_cpu::*;
+import ecore_pkg_alu::*;
 
-pub module cpu_decoder (
+pub module ecore_decoder (
     i_instr     : input  logic<32>,
 
     o_rf_wen    : output logic,

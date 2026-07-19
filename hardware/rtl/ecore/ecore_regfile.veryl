@@ -1,4 +1,4 @@
-pub module cpu_regfile #(
+pub module ecore_regfile #(
     param WIDTH  : u32 = 32,
     param DEPTH  : u32 = 32,
     param R_PORTS: u32 = 2,

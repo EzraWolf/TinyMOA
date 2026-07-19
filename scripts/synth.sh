@@ -26,8 +26,8 @@ trap 'rm -f "$log" "$report"' EXIT
 veryl build --quiet
 
 if ! yosys -q -m slang -p "
-    read_slang -F tinymoa.f --top tinymoa_cpu_top;
-    synth_xilinx -family xc7 -top tinymoa_cpu_top $mapper $flags;
+    read_slang -F tinymoa.f --top tinymoa_ecore_top;
+    synth_xilinx -family xc7 -top tinymoa_ecore_top $mapper $flags;
     tee -o $report stat -tech xilinx
 " >"$log" 2>&1; then
     cat "$log"
