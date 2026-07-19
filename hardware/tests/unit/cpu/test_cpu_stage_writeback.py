@@ -235,15 +235,19 @@ async def x0_write_preserved(dut):
 
 
 @cocotb.test()
-async def exceptions_block_write(dut):
+async def route_status_flags(dut):
     await setup(dut)
 
     dut.i_valid.value = 1
+    dut.i_is_fence.value = 1
+    await _check(dut, i_valid=1, i_is_fence=1, o_valid=1, o_is_fence=1)
+
+    dut.i_is_fence.value = 0
+    dut.i_is_ecall.value = 1
     dut.i_fu_data.value = 7
     dut.i_wb_sel.value = WbSel.FU
     dut.i_rf_wen.value = 1
     dut.i_rf_dst.value = 2
-    dut.i_is_ecall.value = 1
     await _check(
         dut,
         i_valid=1,
@@ -297,31 +301,6 @@ async def exceptions_block_write(dut):
         o_valid=1,
         o_mem_error=1,
     )
-
-
-@cocotb.test()
-async def route_status_flags(dut):
-    await setup(dut)
-
-    dut.i_valid.value = 1
-    dut.i_is_fence.value = 1
-    await _check(dut, i_valid=1, i_is_fence=1, o_valid=1, o_is_fence=1)
-
-    dut.i_is_fence.value = 0
-    dut.i_is_ecall.value = 1
-    await _check(dut, i_valid=1, i_is_ecall=1, o_valid=1, o_is_ecall=1)
-
-    dut.i_is_ecall.value = 0
-    dut.i_is_ebreak.value = 1
-    await _check(dut, i_valid=1, i_is_ebreak=1, o_valid=1, o_is_ebreak=1)
-
-    dut.i_is_ebreak.value = 0
-    dut.i_is_illegal.value = 1
-    await _check(dut, i_valid=1, i_is_illegal=1, o_valid=1, o_is_illegal=1)
-
-    dut.i_is_illegal.value = 0
-    dut.i_mem_error.value = 1
-    await _check(dut, i_valid=1, i_mem_error=1, o_valid=1, o_mem_error=1)
 
 
 @cocotb.test()

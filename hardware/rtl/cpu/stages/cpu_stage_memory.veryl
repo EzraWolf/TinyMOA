@@ -117,7 +117,7 @@ pub module cpu_stage_memory #(
             o_is_ebreak  = i_is_ebreak;
             o_is_illegal = i_is_illegal;
             o_wb_sel     = i_wb_sel;
-            o_rf_wen     = i_rf_wen && !lsu_error;
+            o_rf_wen     = i_rf_wen;
             o_rf_dst     = i_rf_dst;
         }
     }

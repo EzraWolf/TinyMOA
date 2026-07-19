@@ -486,6 +486,7 @@ async def misaligned_access_reports_error(dut):
         o_fu_data=1,
         o_mem_error=1,
         o_wb_sel=WbSel.MEM,
+        o_rf_wen=1,
     )
 
     dut.i_valid.value = 1
@@ -506,6 +507,7 @@ async def misaligned_access_reports_error(dut):
         o_fu_data=1,
         o_mem_error=1,
         o_wb_sel=WbSel.MEM,
+        o_rf_wen=1,
     )
     await FallingEdge(dut.clk)
     dut.i_valid.value = 0
