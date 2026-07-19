@@ -5,6 +5,7 @@ from random import randint
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, Timer
 
+from tests import CHECK_DELAY_NS, CLOCK_PERIOD_NS
 from tests.runner import run
 
 
@@ -14,8 +15,7 @@ XLEN_MASK = (1 << WIDTH) - 1
 
 
 async def setup(dut):
-    clock = Clock(dut.clk, 10, unit="ns")
-    cocotb.start_soon(clock.start())
+    cocotb.start_soon(Clock(dut.clk, CLOCK_PERIOD_NS, "ns").start())
 
     dut.rst.value = 0
     dut.i_wen.value = 0
@@ -29,7 +29,7 @@ async def setup(dut):
 
 
 async def _check(dut, rst=1, i_wen=0, i_data=0, o_full=0, i_ren=0, o_data=0, o_empty=1):
-    await Timer(1, unit="ns")
+    await Timer(CHECK_DELAY_NS, "ns")
     assert dut.rst.value == rst
     assert dut.i_wen.value == i_wen
     assert dut.i_data.value == i_data

@@ -1,11 +1,11 @@
 import os
-from random import randint
-
 import cocotb
 import pytest
+from random import randint
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, Timer
 
+from tests import CHECK_DELAY_NS, CLOCK_PERIOD_NS, N_FUZZ
 from tests.runner import run
 
 
@@ -13,7 +13,7 @@ WIDTH = int(os.environ.get("WIDTH", 64))
 
 
 async def setup(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    cocotb.start_soon(Clock(dut.clk, CLOCK_PERIOD_NS, "ns").start())
 
     dut.rst.value = 0
     dut.i_valid.value = 0
@@ -31,7 +31,7 @@ async def setup(dut):
 async def _check(
     dut, o_valid=0, o_imem_valid=1, o_imem_addr=0, o_pc=None, o_instr=None
 ):
-    await Timer(1, unit="ns")
+    await Timer(CHECK_DELAY_NS, "ns")
     assert dut.o_valid.value == o_valid
     assert dut.o_imem_valid.value == o_imem_valid
     assert dut.o_imem_addr.value == o_imem_addr
@@ -46,7 +46,7 @@ async def pc_resets_zero(dut):
     await setup(dut)
     dut.i_ready.value = 1
     dut.i_imem_ready.value = 1
-    for _ in range(100):
+    for _ in range(N_FUZZ):
         dut.i_imem_rdata.value = randint(1, 0xFFFF_FFFF)
         await FallingEdge(dut.clk)
 
@@ -63,7 +63,7 @@ async def fetch_one_ipc(dut):
 
     dut.i_ready.value = 1
     dut.i_imem_ready.value = 1
-    for i in range(100):
+    for i in range(N_FUZZ):
         instr = randint(0, 0xFFFF_FFFF)
         ext_pc = i * 4
         dut.i_imem_rdata.value = instr
@@ -86,7 +86,7 @@ async def verify_handshake(dut):
     expect_valid = False
     expect_pc = 0
     expect_instr = 0
-    for _ in range(100):
+    for _ in range(N_FUZZ):
         ready = randint(0, 1)
         imem_ready = randint(0, 1)
         instr = randint(0, 0xFFFF_FFFF)

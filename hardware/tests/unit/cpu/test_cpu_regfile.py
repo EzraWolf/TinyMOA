@@ -5,6 +5,7 @@ from random import randint
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, Timer
 
+from tests import CHECK_DELAY_NS, CLOCK_PERIOD_NS
 from tests.runner import run
 
 
@@ -19,7 +20,7 @@ W_ZERO = (0,) * W_PORTS
 
 
 async def setup(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    cocotb.start_soon(Clock(dut.clk, CLOCK_PERIOD_NS, "ns").start())
 
     dut.rst.value = 0
     for i in range(W_PORTS):
@@ -45,7 +46,7 @@ async def _check(
     i_raddr=R_ZERO,
     o_rdata=R_ZERO,
 ):
-    await Timer(1, unit="ns")
+    await Timer(CHECK_DELAY_NS, "ns")
     assert dut.rst.value == rst
     for i in range(W_PORTS):
         assert dut.i_wen[i].value == i_wen[i]

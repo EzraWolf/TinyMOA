@@ -2,12 +2,10 @@ import cocotb
 from random import randint
 from cocotb.triggers import Timer
 
+from tests import CHECK_DELAY_NS, N_FUZZ
 from tests.common import encode_rv32i as rv32i
 from tests.common.cpu_types import AluOp, FuSrc1, FuSrc2, WbSel
 from tests.runner import run
-
-
-N_FUZZ = 100
 
 
 async def _check(
@@ -34,7 +32,7 @@ async def _check(
     o_is_ebreak=0,
     o_is_illegal=0,
 ):
-    await Timer(1, unit="ns")
+    await Timer(CHECK_DELAY_NS, "ns")
     assert dut.i_instr.value == i_instr
     assert dut.o_rf_wen.value == o_rf_wen
     assert dut.o_rf_dst.value == o_rf_dst
