@@ -1,0 +1,128 @@
+import pkg_cpu::*;
+import pkg_cpu_alu::*;
+
+pub module cpu_stage_execute #(
+    param WIDTH: u32 = 32,
+    param DEPTH: u32 = 32,
+) (
+    clk: input clock,
+    rst: input reset,
+
+    i_flush     : input  logic,
+    i_valid     : input  logic,
+    o_ready     : output logic,
+    i_pc        : input  logic<WIDTH>,
+
+    i_fu_op     : input  AluOp,
+    i_fu_data1  : input  logic<WIDTH>,
+    i_fu_data2  : input  logic<WIDTH>,
+
+    i_imm       : input  logic<WIDTH>,
+    i_funct3    : input  logic<3>,
+    i_is_branch : input  logic,
+    i_is_jump   : input  logic,
+    i_is_fence  : input  logic,
+    i_is_ecall  : input  logic,
+    i_is_ebreak : input  logic,
+    i_is_illegal: input  logic,
+
+    i_mem_ren   : input  logic,
+    i_mem_wen   : input  logic,
+    i_store_data: input  logic<WIDTH>,
+
+    i_wb_sel    : input  WbSel,
+    i_rf_wen    : input  logic,
+    i_rf_dst    : input  logic<$clog2(DEPTH)>,
+
+    o_valid     : output logic,
+    i_ready     : input  logic,
+    o_pc        : output logic<WIDTH>,
+    o_fu_data   : output logic<WIDTH>,
+
+    o_funct3    : output logic<3>,
+    o_is_fence  : output logic,
+    o_is_ecall  : output logic,
+    o_is_ebreak : output logic,
+    o_is_illegal: output logic,
+
+    o_mem_ren   : output logic,
+    o_mem_wen   : output logic,
+    o_store_data: output logic<WIDTH>,
+
+    o_wb_sel    : output WbSel,
+    o_rf_wen    : output logic,
+    o_rf_dst    : output logic<$clog2(DEPTH)>,
+
+    o_redirect_valid: output logic,
+    o_redirect_pc   : output logic<WIDTH>,
+) {
+    var fu_data     : logic<WIDTH>;
+    var branch_pc   : logic<WIDTH>;
+    var branch_taken: logic;
+
+    inst u_alu: cpu_alu #(WIDTH) (
+        i_op : i_fu_op,
+        i_a  : i_fu_data1,
+        i_b  : i_fu_data2,
+        o_res: fu_data,
+    );
+
+    inst u_bru: cpu_bru #(WIDTH) (
+        i_valid   : i_valid && i_is_branch,
+        i_op      : i_funct3,
+        i_pc,
+        i_rs1_data: i_fu_data1,
+        i_rs2_data: i_fu_data2,
+        i_imm,
+        o_taken   : branch_taken,
+        o_pc      : branch_pc,
+    );
+
+    assign o_ready = !o_valid || i_ready || i_flush;
+
+    always_ff (clk, rst) {
+        if_reset {
+            o_valid           = 1'b0;
+            o_pc              = '0;
+            o_fu_data         = '0;
+            o_funct3          = '0;
+            o_is_fence        = 1'b0;
+            o_is_ecall        = 1'b0;
+            o_is_ebreak       = 1'b0;
+            o_is_illegal      = 1'b0;
+            o_mem_ren         = 1'b0;
+            o_mem_wen         = 1'b0;
+            o_store_data      = '0;
+            o_wb_sel          = WbSel::NONE;
+            o_rf_wen          = 1'b0;
+            o_rf_dst          = '0;
+            o_redirect_valid  = 1'b0;
+            o_redirect_pc     = '0;
+        } else if i_flush {
+            o_valid           = 1'b0;
+            o_redirect_valid  = 1'b0;
+        } else if o_ready {
+            o_valid           = i_valid;
+            o_pc              = i_pc;
+            o_fu_data         = fu_data;
+            o_funct3          = i_funct3;
+            o_is_fence        = i_is_fence;
+            o_is_ecall        = i_is_ecall;
+            o_is_ebreak       = i_is_ebreak;
+            o_is_illegal      = i_is_illegal;
+            o_mem_ren         = i_mem_ren;
+            o_mem_wen         = i_mem_wen;
+            o_store_data      = i_store_data;
+            o_wb_sel          = i_wb_sel;
+            o_rf_wen          = i_rf_wen;
+            o_rf_dst          = i_rf_dst;
+            o_redirect_valid  = i_valid && (i_is_jump || branch_taken);
+            o_redirect_pc     = '0;
+            if i_valid && i_is_jump {
+                o_redirect_pc = {fu_data[msb:1], 1'b0};
+            } else if i_valid && branch_taken {
+                o_redirect_pc =  branch_pc;
+            }
+        }
+    }
+}

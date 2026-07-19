@@ -1,1 +1,253 @@
+import pkg_cpu::*;
+import pkg_cpu_alu::*;
 
+pub module cpu_top #(
+    param WIDTH: u32 = 32,
+    param DEPTH: u32 = 32,
+) (
+    clk: input clock,
+    rst: input reset,
+
+    o_imem_valid: output logic,
+    i_imem_ready: input  logic,
+    o_imem_addr : output logic<WIDTH>,
+    i_imem_rdata: input  logic<32>,
+
+    o_dmem_valid: output logic,
+    i_dmem_ready: input  logic,
+    o_dmem_ren  : output logic,
+    o_dmem_wen  : output logic,
+    o_dmem_addr : output logic<WIDTH>,
+    o_dmem_wdata: output logic<WIDTH>,
+    o_dmem_wmask: output logic<WIDTH / 8>,
+    i_dmem_rdata: input  logic<WIDTH>,
+
+    o_valid     : output logic,
+    o_pc        : output logic<WIDTH>,
+    o_is_fence  : output logic,
+    o_is_ecall  : output logic,
+    o_is_ebreak : output logic,
+    o_is_illegal: output logic,
+    o_mem_error : output logic,
+) {
+    var fetch_valid: logic;
+    var fetch_ready: logic;
+    var fetch_pc   : logic<WIDTH>;
+    var fetch_instr: logic<32>;
+
+    var decode_valid     : logic;
+    var decode_ready     : logic;
+    var decode_pc        : logic<WIDTH>;
+    var decode_fu_op     : AluOp;
+    var decode_fu_data1  : logic<WIDTH>;
+    var decode_fu_data2  : logic<WIDTH>;
+    var decode_imm       : logic<WIDTH>;
+    var decode_funct3    : logic<3>;
+    var decode_is_branch : logic;
+    var decode_is_jump   : logic;
+    var decode_is_fence  : logic;
+    var decode_is_ecall  : logic;
+    var decode_is_ebreak : logic;
+    var decode_is_illegal: logic;
+    var decode_mem_ren   : logic;
+    var decode_mem_wen   : logic;
+    var decode_store_data: logic<WIDTH>;
+    var decode_wb_sel    : WbSel;
+    var decode_rf_wen    : logic;
+    var decode_rf_dst    : logic<$clog2(DEPTH)>;
+
+    var execute_valid     : logic;
+    var execute_ready     : logic;
+    var execute_pc        : logic<WIDTH>;
+    var execute_fu_data   : logic<WIDTH>;
+    var execute_funct3    : logic<3>;
+    var execute_is_fence  : logic;
+    var execute_is_ecall  : logic;
+    var execute_is_ebreak : logic;
+    var execute_is_illegal: logic;
+    var execute_mem_ren   : logic;
+    var execute_mem_wen   : logic;
+    var execute_store_data: logic<WIDTH>;
+    var execute_wb_sel    : WbSel;
+    var execute_rf_wen    : logic;
+    var execute_rf_dst    : logic<$clog2(DEPTH)>;
+    var redirect_valid    : logic;
+    var redirect_pc       : logic<WIDTH>;
+
+    var memory_valid     : logic;
+    var memory_ready     : logic;
+    var memory_pc        : logic<WIDTH>;
+    var memory_fu_data   : logic<WIDTH>;
+    var memory_load_data : logic<WIDTH>;
+    var memory_is_fence  : logic;
+    var memory_is_ecall  : logic;
+    var memory_is_ebreak : logic;
+    var memory_is_illegal: logic;
+    var memory_error     : logic;
+    var memory_wb_sel    : WbSel;
+    var memory_rf_wen    : logic;
+    var memory_rf_dst    : logic<$clog2(DEPTH)>;
+
+    var writeback_rf_wen : logic;
+    var writeback_rf_dst : logic<$clog2(DEPTH)>;
+    var writeback_rf_data: logic<WIDTH>;
+
+    inst u_fetch: cpu_stage_fetch #(WIDTH) (
+        clk, rst,
+        i_valid     : redirect_valid,
+        i_pc        : redirect_pc,
+        o_imem_valid,
+        i_imem_ready,
+        o_imem_addr,
+        i_imem_rdata,
+        o_valid     : fetch_valid,
+        i_ready     : fetch_ready,
+        o_pc        : fetch_pc,
+        o_instr     : fetch_instr,
+    );
+
+    inst u_decode: cpu_stage_decode #(WIDTH, DEPTH) (
+        clk, rst,
+        i_flush     : redirect_valid,
+        i_valid     : fetch_valid,
+        o_ready     : fetch_ready,
+        i_pc        : fetch_pc,
+        i_instr     : fetch_instr,
+        i_ex_rf_wen : execute_valid && execute_rf_wen,
+        i_ex_rf_dst : execute_rf_dst,
+        i_mem_rf_wen: memory_valid && memory_rf_wen,
+        i_mem_rf_dst: memory_rf_dst,
+        i_wb_wen    : writeback_rf_wen,
+        i_wb_dst    : writeback_rf_dst,
+        i_wb_data   : writeback_rf_data,
+        o_valid     : decode_valid,
+        i_ready     : decode_ready,
+        o_pc        : decode_pc,
+        o_fu_op     : decode_fu_op,
+        o_fu_data1  : decode_fu_data1,
+        o_fu_data2  : decode_fu_data2,
+        o_imm       : decode_imm,
+        o_funct3    : decode_funct3,
+        o_is_branch : decode_is_branch,
+        o_is_jump   : decode_is_jump,
+        o_is_fence  : decode_is_fence,
+        o_is_ecall  : decode_is_ecall,
+        o_is_ebreak : decode_is_ebreak,
+        o_is_illegal: decode_is_illegal,
+        o_mem_ren   : decode_mem_ren,
+        o_mem_wen   : decode_mem_wen,
+        o_store_data: decode_store_data,
+        o_wb_sel    : decode_wb_sel,
+        o_rf_wen    : decode_rf_wen,
+        o_rf_dst    : decode_rf_dst,
+    );
+
+    inst u_execute: cpu_stage_execute #(WIDTH, DEPTH) (
+        clk, rst,
+        i_flush     : 1'b0,
+        i_valid     : decode_valid && !redirect_valid,
+        o_ready     : decode_ready,
+        i_pc        : decode_pc,
+        i_fu_op     : decode_fu_op,
+        i_fu_data1  : decode_fu_data1,
+        i_fu_data2  : decode_fu_data2,
+        i_imm       : decode_imm,
+        i_funct3    : decode_funct3,
+        i_is_branch : decode_is_branch,
+        i_is_jump   : decode_is_jump,
+        i_is_fence  : decode_is_fence,
+        i_is_ecall  : decode_is_ecall,
+        i_is_ebreak : decode_is_ebreak,
+        i_is_illegal: decode_is_illegal,
+        i_mem_ren   : decode_mem_ren,
+        i_mem_wen   : decode_mem_wen,
+        i_store_data: decode_store_data,
+        i_wb_sel    : decode_wb_sel,
+        i_rf_wen    : decode_rf_wen,
+        i_rf_dst    : decode_rf_dst,
+        o_valid     : execute_valid,
+        i_ready     : execute_ready,
+        o_pc        : execute_pc,
+        o_fu_data   : execute_fu_data,
+        o_funct3    : execute_funct3,
+        o_is_fence  : execute_is_fence,
+        o_is_ecall  : execute_is_ecall,
+        o_is_ebreak : execute_is_ebreak,
+        o_is_illegal: execute_is_illegal,
+        o_mem_ren   : execute_mem_ren,
+        o_mem_wen   : execute_mem_wen,
+        o_store_data: execute_store_data,
+        o_wb_sel    : execute_wb_sel,
+        o_rf_wen    : execute_rf_wen,
+        o_rf_dst    : execute_rf_dst,
+        o_redirect_valid: redirect_valid,
+        o_redirect_pc   : redirect_pc,
+    );
+
+    inst u_memory: cpu_stage_memory #(WIDTH, DEPTH) (
+        clk, rst,
+        i_flush     : 1'b0,
+        i_valid     : execute_valid,
+        o_ready     : execute_ready,
+        i_pc        : execute_pc,
+        i_fu_data   : execute_fu_data,
+        i_funct3    : execute_funct3,
+        i_is_fence  : execute_is_fence,
+        i_is_ecall  : execute_is_ecall,
+        i_is_ebreak : execute_is_ebreak,
+        i_is_illegal: execute_is_illegal,
+        i_mem_ren   : execute_mem_ren,
+        i_mem_wen   : execute_mem_wen,
+        i_store_data: execute_store_data,
+        i_wb_sel    : execute_wb_sel,
+        i_rf_wen    : execute_rf_wen,
+        i_rf_dst    : execute_rf_dst,
+        o_dmem_valid,
+        i_dmem_ready,
+        o_dmem_ren,
+        o_dmem_wen,
+        o_dmem_addr,
+        o_dmem_wdata,
+        o_dmem_wmask,
+        i_dmem_rdata,
+        o_valid     : memory_valid,
+        i_ready     : memory_ready,
+        o_load_data : memory_load_data,
+        o_mem_error : memory_error,
+        o_pc        : memory_pc,
+        o_fu_data   : memory_fu_data,
+        o_is_fence  : memory_is_fence,
+        o_is_ecall  : memory_is_ecall,
+        o_is_ebreak : memory_is_ebreak,
+        o_is_illegal: memory_is_illegal,
+        o_wb_sel    : memory_wb_sel,
+        o_rf_wen    : memory_rf_wen,
+        o_rf_dst    : memory_rf_dst,
+    );
+
+    inst u_writeback: cpu_stage_writeback #(WIDTH, DEPTH) (
+        i_valid     : memory_valid,
+        o_ready     : memory_ready,
+        i_pc        : memory_pc,
+        i_fu_data   : memory_fu_data,
+        i_load_data : memory_load_data,
+        i_is_fence  : memory_is_fence,
+        i_is_ecall  : memory_is_ecall,
+        i_is_ebreak : memory_is_ebreak,
+        i_is_illegal: memory_is_illegal,
+        i_mem_error : memory_error,
+        i_wb_sel    : memory_wb_sel,
+        i_rf_wen    : memory_rf_wen,
+        i_rf_dst    : memory_rf_dst,
+        o_rf_wen    : writeback_rf_wen,
+        o_rf_dst    : writeback_rf_dst,
+        o_rf_data   : writeback_rf_data,
+        o_valid,
+        o_pc,
+        o_is_fence,
+        o_is_ecall,
+        o_is_ebreak,
+        o_is_illegal,
+        o_mem_error,
+    );
+}

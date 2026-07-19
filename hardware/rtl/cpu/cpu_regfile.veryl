@@ -1,1 +1,31 @@
+pub module cpu_regfile #(
+    param WIDTH  : u32 = 32,
+    param DEPTH  : u32 = 32,
+    param R_PORTS: u32 = 2,
+    param W_PORTS: u32 = 1,
+) (
+    clk: input clock,
+    // rst: input reset,
 
+    i_wen  : input  logic                [W_PORTS],
+    i_waddr: input  logic<$clog2(DEPTH)> [W_PORTS],
+    i_wdata: input  logic       <WIDTH>  [W_PORTS],
+
+    i_raddr: input  logic<$clog2(DEPTH)> [R_PORTS],
+    o_rdata: output logic       <WIDTH>  [R_PORTS],
+) {
+    var regs: logic<WIDTH> [DEPTH]; // assumes x0 hardwired to 0x0
+
+    // no reset significantly reduces CPU size
+    always_ff (clk) {
+        for i in 0..W_PORTS {
+            if i_wen[i] && i_waddr[i] != 0 {
+                regs[i_waddr[i]] = i_wdata[i];
+            }
+        }
+    }
+
+    for i in 0..R_PORTS :gen_read_ports {
+        assign o_rdata[i] = if (i_raddr[i] != 0) ? regs[i_raddr[i]] : '0;
+    }
+}

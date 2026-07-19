@@ -1,0 +1,197 @@
+import pkg_cpu::*;
+import pkg_cpu_alu::*;
+
+pub module cpu_stage_decode #(
+    param WIDTH: u32 = 32,
+    param DEPTH: u32 = 32,
+) (
+    clk: input clock,
+    rst: input reset,
+
+    i_flush     : input  logic,
+    i_valid     : input  logic,
+    o_ready     : output logic,
+    i_pc        : input  logic<WIDTH>,
+    i_instr     : input  logic<32>,
+
+    i_ex_rf_wen : input logic,
+    i_ex_rf_dst : input logic<$clog2(DEPTH)>,
+    i_mem_rf_wen: input logic,
+    i_mem_rf_dst: input logic<$clog2(DEPTH)>,
+
+    i_wb_wen    : input  logic,
+    i_wb_dst    : input  logic<$clog2(DEPTH)>,
+    i_wb_data   : input  logic<WIDTH>,
+
+    o_valid     : output logic,
+    i_ready     : input  logic,
+    o_pc        : output logic<WIDTH>,
+
+    o_fu_op     : output AluOp,
+    o_fu_data1  : output logic<WIDTH>,
+    o_fu_data2  : output logic<WIDTH>,
+
+    o_imm       : output logic<WIDTH>,
+    o_funct3    : output logic<3>,
+    o_is_branch : output logic,
+    o_is_jump   : output logic,
+    o_is_fence  : output logic,
+    o_is_ecall  : output logic,
+    o_is_ebreak : output logic,
+    o_is_illegal: output logic,
+
+    o_mem_ren   : output logic,
+    o_mem_wen   : output logic,
+    o_store_data: output logic<WIDTH>,
+
+    o_wb_sel    : output WbSel,
+    o_rf_wen    : output logic,
+    o_rf_dst    : output logic<$clog2(DEPTH)>,
+) {
+    const RF_R_PORTS  : u32 = 2; // required for rs1 and rs2
+    const RF_W_PORTS  : u32 = 1;
+
+    var dec_rf_src    : logic<5> [RF_R_PORTS];
+    var dec_rf_dst    : logic<5>;
+    var dec_rf_wen    : logic;
+    var dec_fu_op     : AluOp;
+    var dec_fu_src1   : FuSrc1;
+    var dec_fu_src2   : FuSrc2;
+    var dec_imm       : logic<32>;
+    var dec_mem_ren   : logic;
+    var dec_mem_wen   : logic;
+    var dec_wb_sel    : WbSel;
+    var dec_funct3    : logic<3>;
+    var dec_is_load   : logic;
+    var dec_is_store  : logic;
+    var dec_is_jump   : logic;
+    var dec_is_branch : logic;
+    var dec_is_fence  : logic;
+    var dec_is_ecall  : logic;
+    var dec_is_ebreak : logic;
+    var dec_is_illegal: logic;
+    var hazard        : logic;
+
+    let ext_imm: logic<WIDTH> = {dec_imm[msb] repeat WIDTH - 32, dec_imm};
+    let output_ready: logic = !o_valid || i_ready;
+
+    inst u_decoder: cpu_decoder (
+        i_instr,
+        o_rf_wen    : dec_rf_wen,
+        o_rf_dst    : dec_rf_dst,
+        o_rf_src1   : dec_rf_src[0],
+        o_rf_src2   : dec_rf_src[1],
+        o_fu_op     : dec_fu_op,
+        o_fu_src1   : dec_fu_src1,
+        o_fu_src2   : dec_fu_src2,
+        o_imm       : dec_imm,
+        o_mem_ren   : dec_mem_ren,
+        o_mem_wen   : dec_mem_wen,
+        o_wb_sel    : dec_wb_sel,
+        o_funct3    : dec_funct3,
+        o_is_load   : dec_is_load,
+        o_is_store  : dec_is_store,
+        o_is_jump   : dec_is_jump,
+        o_is_branch : dec_is_branch,
+        o_is_fence  : dec_is_fence,
+        o_is_ecall  : dec_is_ecall,
+        o_is_ebreak : dec_is_ebreak,
+        o_is_illegal: dec_is_illegal,
+    );
+    var rf_wen  : logic                [RF_W_PORTS];
+    var rf_waddr: logic<$clog2(DEPTH)> [RF_W_PORTS];
+    var rf_wdata: logic       <WIDTH>  [RF_W_PORTS];
+    var rf_raddr: logic<$clog2(DEPTH)> [RF_R_PORTS];
+    var rf_rdata: logic       <WIDTH>  [RF_R_PORTS];
+
+    inst u_regfile: cpu_regfile #(
+        WIDTH,
+        DEPTH,
+        R_PORTS: RF_R_PORTS,
+        W_PORTS: RF_W_PORTS,
+    ) (
+        clk, // rst,
+        i_wen  : rf_wen,
+        i_waddr: rf_waddr,
+        i_wdata: rf_wdata,
+        i_raddr: rf_raddr,
+        o_rdata: rf_rdata,
+    );
+
+    for i in 0..RF_R_PORTS :connect_read_ports {
+        assign rf_raddr[i] = dec_rf_src[i][$clog2(DEPTH) - 1:0];
+    }
+    for i in 0..RF_W_PORTS :connect_write_ports {
+        assign rf_wen  [i] = i_wb_wen;
+        assign rf_waddr[i] = i_wb_dst;
+        assign rf_wdata[i] = i_wb_data;
+    }
+
+    always_comb {
+        hazard = 1'b0;
+        for i in 0..RF_R_PORTS {
+            if i_valid && dec_rf_src[i] != 0 {
+                if o_valid && o_rf_wen && o_rf_dst == dec_rf_src[i][$clog2(DEPTH) - 1:0] {
+                    hazard = 1'b1;
+                }
+                if i_ex_rf_wen && i_ex_rf_dst == dec_rf_src[i][$clog2(DEPTH) - 1:0] {
+                    hazard = 1'b1;
+                }
+                if i_mem_rf_wen && i_mem_rf_dst == dec_rf_src[i][$clog2(DEPTH) - 1:0] {
+                    hazard = 1'b1;
+                }
+            }
+        }
+    }
+
+    assign o_ready = i_flush || (output_ready && !hazard);
+
+    always_ff (clk, rst) {
+        if_reset {
+            o_valid      = 1'b0;
+            o_pc         = '0;
+            o_fu_op      = AluOp::ADD;
+            o_fu_data1   = '0;
+            o_fu_data2   = '0;
+            o_imm        = '0;
+            o_funct3     = '0;
+            o_is_branch  = 1'b0;
+            o_is_jump    = 1'b0;
+            o_is_fence   = 1'b0;
+            o_is_ecall   = 1'b0;
+            o_is_ebreak  = 1'b0;
+            o_is_illegal = 1'b0;
+            o_mem_ren    = 1'b0;
+            o_mem_wen    = 1'b0;
+            o_store_data = '0;
+            o_wb_sel     = WbSel::NONE;
+            o_rf_wen     = 1'b0;
+            o_rf_dst     = '0;
+        } else if i_flush {
+            o_valid = 1'b0;
+        } else if output_ready {
+            o_valid = 1'b0;
+            if !hazard {
+                o_valid      = i_valid;
+                o_pc         = i_pc;
+                o_fu_op      = dec_fu_op;
+                o_fu_data1   = if (dec_fu_src1 == FuSrc1::PC)  ? i_pc    : rf_rdata[0];
+                o_fu_data2   = if (dec_fu_src2 == FuSrc2::IMM) ? ext_imm : rf_rdata[1];
+                o_imm        = ext_imm;
+                o_funct3     = dec_funct3;
+                o_is_branch  = dec_is_branch;
+                o_is_jump    = dec_is_jump;
+                o_is_fence   = dec_is_fence;
+                o_is_ecall   = dec_is_ecall;
+                o_is_ebreak  = dec_is_ebreak;
+                o_is_illegal = dec_is_illegal;
+                o_mem_ren    = dec_mem_ren;
+                o_mem_wen    = dec_mem_wen;
+                o_store_data = rf_rdata[1];
+                o_wb_sel     = dec_wb_sel;
+                o_rf_wen     = dec_rf_wen;
+                o_rf_dst     = dec_rf_dst[$clog2(DEPTH) - 1:0];
+            }
+        }
+    }
+}

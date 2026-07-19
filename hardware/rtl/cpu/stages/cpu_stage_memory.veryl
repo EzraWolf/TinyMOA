@@ -1,0 +1,124 @@
+import pkg_cpu::*;
+
+pub module cpu_stage_memory #(
+    param WIDTH: u32 = 32,
+    param DEPTH: u32 = 32,
+) (
+    clk: input clock,
+    rst: input reset,
+
+    i_flush     : input  logic,
+    i_valid     : input  logic,
+    o_ready     : output logic,
+    i_pc        : input  logic<WIDTH>,
+    i_fu_data   : input  logic<WIDTH>,
+    i_funct3    : input  logic<3>,
+    i_is_fence  : input  logic,
+    i_is_ecall  : input  logic,
+    i_is_ebreak : input  logic,
+    i_is_illegal: input  logic,
+
+    i_mem_ren   : input  logic,
+    i_mem_wen   : input  logic,
+    i_store_data: input  logic<WIDTH>,
+
+    i_wb_sel    : input  WbSel,
+    i_rf_wen    : input  logic,
+    i_rf_dst    : input  logic<$clog2(DEPTH)>,
+
+    o_dmem_valid: output logic,
+    i_dmem_ready: input  logic,
+    o_dmem_ren  : output logic,
+    o_dmem_wen  : output logic,
+    o_dmem_addr : output logic<WIDTH>,
+    o_dmem_wdata: output logic<WIDTH>,
+    o_dmem_wmask: output logic<WIDTH / 8>,
+    i_dmem_rdata: input  logic<WIDTH>,
+
+    o_valid     : output logic,
+    i_ready     : input  logic,
+    o_load_data : output logic<WIDTH>,
+    o_mem_error : output logic,
+
+    // passthrough below
+    o_pc        : output logic<WIDTH>,
+    o_fu_data   : output logic<WIDTH>,
+    o_is_fence  : output logic,
+    o_is_ecall  : output logic,
+    o_is_ebreak : output logic,
+    o_is_illegal: output logic,
+    o_wb_sel    : output WbSel,
+    o_rf_wen    : output logic,
+    o_rf_dst    : output logic<$clog2(DEPTH)>,
+) {
+    var lsu_wdata    : logic<WIDTH>;
+    var lsu_wmask    : logic<WIDTH / 8>;
+    var lsu_load_data: logic<WIDTH>;
+    var lsu_error    : logic;
+
+    let output_ready : logic = !o_valid || i_ready;
+    let mem_access   : logic = i_mem_ren || i_mem_wen;
+
+    inst u_lsu: cpu_lsu #(WIDTH) (
+        i_addr      : i_fu_data,
+        i_store_data,
+        i_op        : i_funct3,
+        i_is_load   : i_valid && i_mem_ren,
+        i_is_store  : i_valid && i_mem_wen,
+        i_rdata     : i_dmem_rdata,
+        o_wdata     : lsu_wdata,
+        o_wmask     : lsu_wmask,
+        o_load_data : lsu_load_data,
+        o_error     : lsu_error,
+    );
+
+    assign o_dmem_valid = i_valid && mem_access && !lsu_error && output_ready && !i_flush;
+    assign o_ready = i_flush || (output_ready && (!i_valid || !mem_access || lsu_error || i_dmem_ready));
+
+    always_comb {
+        o_dmem_ren   = 1'b0;
+        o_dmem_wen   = 1'b0;
+        o_dmem_addr  = '0;
+        o_dmem_wdata = '0;
+        o_dmem_wmask = '0;
+        if o_dmem_valid {
+            o_dmem_ren   = i_mem_ren;
+            o_dmem_wen   = i_mem_wen;
+            o_dmem_addr  = {i_fu_data[msb:$clog2(WIDTH / 8)], 1'b0 repeat $clog2(WIDTH / 8)};
+            o_dmem_wdata = lsu_wdata;
+            o_dmem_wmask = lsu_wmask;
+        }
+    }
+
+    always_ff (clk, rst) {
+        if_reset {
+            o_valid      = 1'b0;
+            o_load_data  = '0;
+            o_mem_error  = 1'b0;
+            o_pc         = '0;
+            o_fu_data    = '0;
+            o_is_fence   = 1'b0;
+            o_is_ecall   = 1'b0;
+            o_is_ebreak  = 1'b0;
+            o_is_illegal = 1'b0;
+            o_wb_sel     = WbSel::NONE;
+            o_rf_wen     = 1'b0;
+            o_rf_dst     = '0;
+        } else if i_flush {
+            o_valid = 1'b0;
+        } else if o_ready {
+            o_valid      = i_valid;
+            o_load_data  = lsu_load_data;
+            o_mem_error  = lsu_error;
+            o_pc         = i_pc;
+            o_fu_data    = i_fu_data;
+            o_is_fence   = i_is_fence;
+            o_is_ecall   = i_is_ecall;
+            o_is_ebreak  = i_is_ebreak;
+            o_is_illegal = i_is_illegal;
+            o_wb_sel     = i_wb_sel;
+            o_rf_wen     = i_rf_wen;
+            o_rf_dst     = i_rf_dst;
+        }
+    }
+}

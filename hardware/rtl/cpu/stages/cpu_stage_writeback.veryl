@@ -1,0 +1,80 @@
+import pkg_cpu::*;
+
+pub module cpu_stage_writeback #(
+    param WIDTH: u32 = 32,
+    param DEPTH: u32 = 32,
+) (
+    i_valid     : input  logic,
+    o_ready     : output logic,
+    i_pc        : input  logic<WIDTH>,
+    i_fu_data   : input  logic<WIDTH>,
+    i_load_data : input  logic<WIDTH>,
+    i_is_fence  : input  logic,
+    i_is_ecall  : input  logic,
+    i_is_ebreak : input  logic,
+    i_is_illegal: input  logic,
+    i_mem_error : input  logic,
+
+    i_wb_sel    : input WbSel,
+    i_rf_wen    : input logic,
+    i_rf_dst    : input logic<$clog2(DEPTH)>,
+
+    o_rf_wen    : output logic,
+    o_rf_dst    : output logic<$clog2(DEPTH)>,
+    o_rf_data   : output logic<WIDTH>,
+
+    o_valid     : output logic,
+    o_pc        : output logic<WIDTH>,
+    o_is_fence  : output logic,
+    o_is_ecall  : output logic,
+    o_is_ebreak : output logic,
+    o_is_illegal: output logic,
+    o_mem_error : output logic,
+) {
+    let exception: logic = i_is_ecall || i_is_ebreak || i_is_illegal || i_mem_error;
+
+    assign o_ready = 1'b1;
+
+    always_comb {
+        o_rf_wen     = 1'b0;
+        o_rf_dst     = '0;
+        o_rf_data    = '0;
+        o_valid      = i_valid;
+        o_pc         = '0;
+        o_is_fence   = 1'b0;
+        o_is_ecall   = 1'b0;
+        o_is_ebreak  = 1'b0;
+        o_is_illegal = 1'b0;
+        o_mem_error  = 1'b0;
+
+        if i_valid {
+            o_pc         = i_pc;
+            o_is_fence   = i_is_fence;
+            o_is_ecall   = i_is_ecall;
+            o_is_ebreak  = i_is_ebreak;
+            o_is_illegal = i_is_illegal;
+            o_mem_error  = i_mem_error;
+
+            if i_rf_wen && !exception {
+                case i_wb_sel {
+                    WbSel::FU: {
+                        o_rf_wen  = 1'b1;
+                        o_rf_dst  = i_rf_dst;
+                        o_rf_data = i_fu_data;
+                    }
+                    WbSel::PC: {
+                        o_rf_wen  = 1'b1;
+                        o_rf_dst  = i_rf_dst;
+                        o_rf_data = i_pc + 4;
+                    }
+                    WbSel::MEM: {
+                        o_rf_wen  = 1'b1;
+                        o_rf_dst  = i_rf_dst;
+                        o_rf_data = i_load_data;
+                    }
+                    default: {}
+                }
+            }
+        }
+    }
+}

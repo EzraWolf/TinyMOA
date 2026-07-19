@@ -1,0 +1,35 @@
+// currently setup for in-order. OoO has similar interface but becomes backend FU
+pub module cpu_bru #(
+    param WIDTH: u32 = 32,
+) (
+    i_valid   : input  logic,
+    i_op      : input  logic<3>, // funct3
+    i_pc      : input  logic<WIDTH>,
+    i_rs1_data: input  logic<WIDTH>,
+    i_rs2_data: input  logic<WIDTH>,
+    i_imm     : input  logic<WIDTH>,
+
+    o_taken   : output logic,
+    o_pc      : output logic<WIDTH>,
+) {
+    let eq : logic = i_rs1_data == i_rs2_data;
+    let lt : logic = $signed(i_rs1_data) <: $signed(i_rs2_data);
+    let ltu: logic = i_rs1_data <: i_rs2_data;
+
+    assign o_pc = if (o_taken == 1'b1) ? (i_pc + i_imm) : i_pc;
+
+    always_comb {
+        o_taken = 1'b0;
+        if i_valid {
+            case i_op {
+                3'b000: o_taken =  eq;  // BEQ
+                3'b001: o_taken = !eq;  // BNE
+                3'b100: o_taken =  lt;  // BLT
+                3'b101: o_taken = !lt;  // BGE
+                3'b110: o_taken =  ltu; // BLTU
+                3'b111: o_taken = !ltu; // BGEU
+                default: o_taken = 1'b0;
+            }
+        }
+    }
+}

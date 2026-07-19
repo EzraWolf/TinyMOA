@@ -2,9 +2,11 @@ import os
 import random
 import pytest
 import cocotb
-from enum import Enum
 from cocotb.triggers import Timer
-from ...runner import run
+
+from tests import CHECK_DELAY_NS, N_FUZZ
+from tests.common.cpu_types import AluOp
+from tests.runner import run
 
 
 WIDTH = int(os.environ.get("WIDTH", 8))
@@ -13,29 +15,11 @@ XLEN_MASK = (1 << WIDTH) - 1
 X32_MASK = 0xFFFF_FFFF
 
 
-class AluOp(Enum):
-    ADD = 0b0000
-    ADDW = 0b0001
-    SUB = 0b0010
-    SUBW = 0b0011
-    OR = 0b0100
-    AND = 0b0101
-    XOR = 0b0110
-    SLT = 0b0111
-    SLTU = 0b1000
-    SLL = 0b1001
-    SLLW = 0b1010
-    SRL = 0b1011
-    SRLW = 0b1100
-    SRA = 0b1101
-    SRAW = 0b1110
-
-
 async def _alu(dut, i_op: AluOp, i_a, i_b):
     dut.i_op.value = i_op.value
     dut.i_a.value = i_a
     dut.i_b.value = i_b
-    await Timer(1, "ns")
+    await Timer(CHECK_DELAY_NS, "ns")
     return int(dut.o_res.value)
 
 
@@ -54,7 +38,7 @@ async def params_set(dut):
 
 @cocotb.test()
 async def add_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = (a + b) & XLEN_MASK
@@ -78,7 +62,7 @@ async def add_wrap(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def addw_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = _sext((a + b) & X32_MASK, 32) & XLEN_MASK
@@ -88,7 +72,7 @@ async def addw_basic(dut):
 
 @cocotb.test()
 async def sub_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = (a - b) & XLEN_MASK
@@ -112,7 +96,7 @@ async def sub_borrow_one(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def subw_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = _sext((a - b) & X32_MASK, 32) & XLEN_MASK
@@ -122,7 +106,7 @@ async def subw_basic(dut):
 
 @cocotb.test()
 async def or_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = a | b
@@ -132,7 +116,7 @@ async def or_basic(dut):
 
 @cocotb.test()
 async def and_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = a & b
@@ -142,7 +126,7 @@ async def and_basic(dut):
 
 @cocotb.test()
 async def xor_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = a ^ b
@@ -152,7 +136,7 @@ async def xor_basic(dut):
 
 @cocotb.test()
 async def slt_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = 1 if _sext(a, WIDTH) < _sext(b, WIDTH) else 0
@@ -162,7 +146,7 @@ async def slt_basic(dut):
 
 @cocotb.test()
 async def sltu_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, XLEN_MASK)
         exp = 1 if a < b else 0
@@ -208,7 +192,7 @@ async def sltu_max(dut):
 
 @cocotb.test()
 async def sll_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, SHAMT_MASK)
         exp = (a << b) & XLEN_MASK
@@ -218,7 +202,7 @@ async def sll_basic(dut):
 
 @cocotb.test()
 async def srl_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, SHAMT_MASK)
         exp = a >> b
@@ -228,7 +212,7 @@ async def srl_basic(dut):
 
 @cocotb.test()
 async def sra_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, XLEN_MASK)
         b = random.randint(0, SHAMT_MASK)
         exp = (_sext(a, WIDTH) >> b) & XLEN_MASK
@@ -266,7 +250,7 @@ async def sra_fill_zero(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def sllw_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, X32_MASK)
         b = random.randint(0, SHAMT_MASK)
         exp = _sext((a << b) & X32_MASK, 32) & XLEN_MASK
@@ -276,7 +260,7 @@ async def sllw_basic(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def srlw_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, X32_MASK)
         b = random.randint(0, SHAMT_MASK)
         exp = _sext(a >> b, 32) & XLEN_MASK
@@ -286,7 +270,7 @@ async def srlw_basic(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def sraw_basic(dut):
-    for _ in range(20):
+    for _ in range(N_FUZZ):
         a = random.randint(0, X32_MASK)
         b = random.randint(0, SHAMT_MASK)
         sra32 = (_sext(a, 32) >> b) & X32_MASK

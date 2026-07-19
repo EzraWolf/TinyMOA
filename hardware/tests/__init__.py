@@ -1,0 +1,8 @@
+# basic suite-wide setup configs
+
+N_FUZZ = 500
+
+CLOCK_MHZ = 100
+
+CLOCK_PERIOD_NS = 1000 / CLOCK_MHZ
+CHECK_DELAY_NS = CLOCK_PERIOD_NS / 10

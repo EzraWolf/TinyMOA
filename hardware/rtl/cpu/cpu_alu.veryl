@@ -19,21 +19,21 @@ pub module cpu_alu #(
         case (i_op) {
             AluOp::ADD : result = i_a + i_b;
             AluOp::SUB : result = i_a - i_b;
-            AluOp::OR  : result = i_a | i_b;
             AluOp::AND : result = i_a & i_b;
+            AluOp::OR  : result = i_a | i_b;
             AluOp::XOR : result = i_a ^ i_b;
             AluOp::SLL : result = i_a << shamt;
             AluOp::SRL : result = i_a >> shamt;
             AluOp::SRA : result = $signed(i_a) >>> shamt;
-            // TODO: Figure out how to support parameterization WIDTH
             AluOp::SLT : result = {1'b0 repeat (WIDTH - 'b1), $signed(i_a) <: $signed(i_b)};
             AluOp::SLTU: result = {1'b0 repeat (WIDTH - 'b1), i_a <: i_b};
             default    : result = '0;
         }
     }
 
-    var w_result: logic<WIDTH>;
     if (WIDTH >= 64) :gen_w_ops {
+        var w_result: logic<WIDTH>;
+
         let i_a32: logic<32> = i_a[31:0];
         let i_b32: logic<32> = i_b[31:0];
 
@@ -53,25 +53,9 @@ pub module cpu_alu #(
                 default    : w_result = '0;
             }
         }
+
+        assign o_res = result | w_result;
+    } else :gen_no_w_ops {
+        assign o_res = result;
     }
-
-    assign o_res = result | w_result;
-}
-
-pub module dut_cpu_alu #(
-    param WIDTH: u32 = 64,
-) (
-    i_op: input pkg_cpu_alu::AluOp,
-
-    i_a: input logic<WIDTH>,
-    i_b: input logic<WIDTH>,
-
-    o_res: output logic<WIDTH>,
-) {
-    initial {
-        $dumpfile("dut_cpu_alu.fst");
-        $dumpvars(0, dut_cpu_alu);
-    }
-
-    inst dut_cpu_alu: cpu_alu #( WIDTH ) ( i_op, i_a, i_b, o_res );
 }

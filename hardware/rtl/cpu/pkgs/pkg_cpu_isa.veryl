@@ -1,4 +1,0 @@
-// RV32I instruction base
-pub package pkg_cpu_rv64i {}
-
-// RV64I instruction extension
