@@ -25,6 +25,9 @@ pub module cpu_decoder (
     o_is_store  : output logic,
     o_is_jump   : output logic,
     o_is_branch : output logic,
+    o_is_fence  : output logic,
+    o_is_ecall  : output logic,
+    o_is_ebreak : output logic,
     o_is_illegal: output logic,
 ) {
     let imm_i : logic<32> = {i_instr[msb] repeat 21, i_instr[30:20]};
@@ -59,6 +62,9 @@ pub module cpu_decoder (
         o_is_store   = 1'b0;
         o_is_jump    = 1'b0;
         o_is_branch  = 1'b0;
+        o_is_fence   = 1'b0;
+        o_is_ecall   = 1'b0;
+        o_is_ebreak  = 1'b0;
         o_is_illegal = 1'b0;
 
         case quad {
@@ -165,12 +171,42 @@ pub module cpu_decoder (
                         o_wb_sel  = WbSel::FU;
                         o_imm     = imm_u;
                     }
-                    // 5'b11100: {} // TODO: system
-                    // 5'b00011: {} // TODO: fence
+                    5'b00011: { // FENCE
+                        o_fu_src1 = FuSrc1::NONE;
+                        o_fu_src2 = FuSrc2::NONE;
+                        o_wb_sel  = WbSel::NONE;
+                        if funct3 == 3'b000 {
+                            o_is_fence = 1'b1;
+                        } else {
+                            o_is_illegal = 1'b1;
+                        }
+                    }
+                    5'b11100: { // ECALL, EBREAK
+                        o_fu_src1 = FuSrc1::NONE;
+                        o_fu_src2 = FuSrc2::NONE;
+                        o_wb_sel  = WbSel::NONE;
+                        case i_instr {
+                            32'h00000073: o_is_ecall  = 1'b1;
+                            32'h00100073: o_is_ebreak = 1'b1;
+                            default     : o_is_illegal = 1'b1;
+                        }
+                    }
                     default: o_is_illegal = 1'b1;
                 }
             }
             default: o_is_illegal = 1'b1;
+        }
+
+        if o_is_illegal {
+            o_fu_op      = AluOp::ADD;
+            o_fu_src1    = FuSrc1::NONE;
+            o_fu_src2    = FuSrc2::NONE;
+            o_imm        = 32'b0;
+            o_wb_sel     = WbSel::NONE;
+            o_is_load    = 1'b0;
+            o_is_store   = 1'b0;
+            o_is_jump    = 1'b0;
+            o_is_branch  = 1'b0;
         }
     }
 }

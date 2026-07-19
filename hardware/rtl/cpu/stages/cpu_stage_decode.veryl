@@ -30,6 +30,10 @@ pub module cpu_stage_decode #(
     o_funct3    : output logic<3>,
     o_is_branch : output logic,
     o_is_jump   : output logic,
+    o_is_fence  : output logic,
+    o_is_ecall  : output logic,
+    o_is_ebreak : output logic,
+    o_is_illegal: output logic,
 
     o_mem_ren   : output logic,
     o_mem_wen   : output logic,
@@ -57,6 +61,9 @@ pub module cpu_stage_decode #(
     var dec_is_store  : logic;
     var dec_is_jump   : logic;
     var dec_is_branch : logic;
+    var dec_is_fence  : logic;
+    var dec_is_ecall  : logic;
+    var dec_is_ebreak : logic;
     var dec_is_illegal: logic;
 
     let ext_imm: logic<WIDTH> = {dec_imm[msb] repeat WIDTH - 32, dec_imm};
@@ -79,6 +86,9 @@ pub module cpu_stage_decode #(
         o_is_store  : dec_is_store,
         o_is_jump   : dec_is_jump,
         o_is_branch : dec_is_branch,
+        o_is_fence  : dec_is_fence,
+        o_is_ecall  : dec_is_ecall,
+        o_is_ebreak : dec_is_ebreak,
         o_is_illegal: dec_is_illegal,
     );
     var rf_wen  : logic                [RF_W_PORTS];
@@ -123,6 +133,10 @@ pub module cpu_stage_decode #(
             o_funct3     = '0;
             o_is_branch  = 1'b0;
             o_is_jump    = 1'b0;
+            o_is_fence   = 1'b0;
+            o_is_ecall   = 1'b0;
+            o_is_ebreak  = 1'b0;
+            o_is_illegal = 1'b0;
             o_mem_ren    = 1'b0;
             o_mem_wen    = 1'b0;
             o_store_data = '0;
@@ -141,6 +155,10 @@ pub module cpu_stage_decode #(
             o_funct3     = dec_funct3;
             o_is_branch  = dec_is_branch;
             o_is_jump    = dec_is_jump;
+            o_is_fence   = dec_is_fence;
+            o_is_ecall   = dec_is_ecall;
+            o_is_ebreak  = dec_is_ebreak;
+            o_is_illegal = dec_is_illegal;
             o_mem_ren    = dec_mem_ren;
             o_mem_wen    = dec_mem_wen;
             o_store_data = rf_rdata[1];
