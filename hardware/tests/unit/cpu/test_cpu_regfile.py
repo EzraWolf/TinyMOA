@@ -22,7 +22,7 @@ W_ZERO = (0,) * W_PORTS
 async def setup(dut):
     cocotb.start_soon(Clock(dut.clk, CLOCK_PERIOD_NS, "ns").start())
 
-    dut.rst.value = 0
+    # dut.rst.value = 0
     for i in range(W_PORTS):
         dut.i_wen[i].value = 0
         dut.i_waddr[i].value = 0
@@ -32,14 +32,14 @@ async def setup(dut):
         dut.i_raddr[i].value = 0
 
     await FallingEdge(dut.clk)
-    dut.rst.value = 1
+    # dut.rst.value = 1
 
     await _check(dut)
 
 
 async def _check(
     dut,
-    rst=1,
+    # rst=1,
     i_wen=W_ZERO,
     i_waddr=W_ZERO,
     i_wdata=W_ZERO,
@@ -47,7 +47,7 @@ async def _check(
     o_rdata=R_ZERO,
 ):
     await Timer(CHECK_DELAY_NS, "ns")
-    assert dut.rst.value == rst
+    # assert dut.rst.value == rst
     for i in range(W_PORTS):
         assert dut.i_wen[i].value == i_wen[i]
         assert dut.i_waddr[i].value == i_waddr[i]
@@ -170,6 +170,7 @@ async def back_to_back_writes(dut):
     await _read(dut, [2] * R_PORTS, [data2] * R_PORTS)
 
 
+"""
 @cocotb.test()
 async def reset_clears(dut):
     await setup(dut)
@@ -184,6 +185,7 @@ async def reset_clears(dut):
 
     for addr in range(DEPTH):
         await _read(dut, [addr] * R_PORTS, [0] * R_PORTS)
+"""
 
 
 @pytest.mark.parametrize(

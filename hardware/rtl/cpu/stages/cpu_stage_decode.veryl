@@ -110,7 +110,7 @@ pub module cpu_stage_decode #(
         R_PORTS: RF_R_PORTS,
         W_PORTS: RF_W_PORTS,
     ) (
-        clk, rst,
+        clk, // rst,
         i_wen  : rf_wen,
         i_waddr: rf_waddr,
         i_wdata: rf_wdata,

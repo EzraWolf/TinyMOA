@@ -167,7 +167,15 @@ async def reset_clears(dut):
     )
 
     dut.rst.value = 0
-    await _check(dut, rst=0, i_valid=1, i_ready=1, i_pc=4, i_instr=instr)
+    await _check(
+        dut,
+        rst=0,
+        i_valid=1,
+        i_ready=1,
+        i_pc=4,
+        i_instr=instr,
+        # o_fu_data1=data,
+    )
     dut.rst.value = 1
 
     await FallingEdge(dut.clk)
@@ -179,6 +187,7 @@ async def reset_clears(dut):
         i_instr=instr,
         o_valid=1,
         o_pc=4,
+        o_fu_data1=data,
         o_wb_sel=WbSel.FU,
         o_rf_wen=1,
         o_rf_dst=2,
@@ -523,6 +532,7 @@ async def hold_on_backpressure(dut):
 @cocotb.test()
 async def stall_on_raw_hazard(dut):
     await setup(dut)
+    await _write(dut, 1, 0)
 
     producer = rv32i.encode_addi(1, 0, 1)
     consumer = rv32i.encode_add(2, 1, 0)

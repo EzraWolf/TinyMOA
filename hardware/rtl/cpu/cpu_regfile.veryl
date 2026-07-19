@@ -5,7 +5,7 @@ pub module cpu_regfile #(
     param W_PORTS: u32 = 1,
 ) (
     clk: input clock,
-    rst: input reset,
+    // rst: input reset,
 
     i_wen  : input  logic                [W_PORTS],
     i_waddr: input  logic<$clog2(DEPTH)> [W_PORTS],
@@ -16,14 +16,11 @@ pub module cpu_regfile #(
 ) {
     var regs: logic<WIDTH> [DEPTH]; // assumes x0 hardwired to 0x0
 
-    always_ff (clk, rst) {
-        if_reset {
-            for i in 0..DEPTH { regs[i] = '0; }
-        } else {
-            for i in 0..W_PORTS {
-                if i_wen[i] && i_waddr[i] != 0 {
-                    regs[i_waddr[i]] = i_wdata[i];
-                }
+    // no reset significantly reduces CPU size
+    always_ff (clk) {
+        for i in 0..W_PORTS {
+            if i_wen[i] && i_waddr[i] != 0 {
+                regs[i_waddr[i]] = i_wdata[i];
             }
         }
     }
