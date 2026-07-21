@@ -42,5 +42,7 @@ class MemOp(IntEnum):
     BYTE = 0b000
     HALF = 0b001
     WORD = 0b010
+    DOUBLE = 0b011  # RV64I only
     BYTE_U = 0b100
     HALF_U = 0b101
+    WORD_U = 0b110  # RV64I only

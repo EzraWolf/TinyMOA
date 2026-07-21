@@ -174,6 +174,46 @@ async def lw_offsets_sign_extend(dut):
             )
 
 
+@cocotb.test(skip=(WIDTH < 64))
+async def lwu_offsets_zero_extend(dut):
+    await setup(dut)
+
+    dut.i_op.value = MemOp.WORD_U
+    dut.i_is_load.value = 1
+    for offset in range(0, BYTES, 4):
+        for _ in range(N_FUZZ):
+            rdata = randint(0, XLEN_MASK)
+            data = (rdata >> (offset * 8)) & 0xFFFF_FFFF
+            dut.i_addr.value = offset
+            dut.i_rdata.value = rdata
+            await _check(
+                dut,
+                i_addr=offset,
+                i_op=MemOp.WORD_U,
+                i_is_load=1,
+                i_rdata=rdata,
+                o_load_data=data,
+            )
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def ld_loads_doubleword(dut):
+    await setup(dut)
+
+    dut.i_op.value = MemOp.DOUBLE
+    dut.i_is_load.value = 1
+    for _ in range(N_FUZZ):
+        data = randint(0, XLEN_MASK)
+        dut.i_rdata.value = data
+        await _check(
+            dut,
+            i_op=MemOp.DOUBLE,
+            i_is_load=1,
+            i_rdata=data,
+            o_load_data=data,
+        )
+
+
 @cocotb.test()
 async def sb_offsets_set_mask_data(dut):
     await setup(dut)
@@ -238,6 +278,25 @@ async def sw_sets_full_mask_data(dut):
             )
 
 
+@cocotb.test(skip=(WIDTH < 64))
+async def sd_sets_full_mask_data(dut):
+    await setup(dut)
+
+    dut.i_op.value = MemOp.DOUBLE
+    dut.i_is_store.value = 1
+    for _ in range(N_FUZZ):
+        data = randint(0, XLEN_MASK)
+        dut.i_store_data.value = data
+        await _check(
+            dut,
+            i_store_data=data,
+            i_op=MemOp.DOUBLE,
+            i_is_store=1,
+            o_wdata=data,
+            o_wmask=0xFF,
+        )
+
+
 @cocotb.test()
 async def misaligned_half_reports_error(dut):
     await setup(dut)
@@ -280,18 +339,40 @@ async def misaligned_word_reports_error(dut):
             )
 
 
+@cocotb.test(skip=(WIDTH < 64))
+async def misaligned_doubleword_reports_error(dut):
+    await setup(dut)
+
+    for is_load in (0, 1):
+        dut.i_is_load.value = is_load
+        dut.i_is_store.value = not is_load
+        dut.i_op.value = MemOp.DOUBLE
+        for offset in range(1, BYTES):
+            dut.i_addr.value = offset
+            await _check(
+                dut,
+                i_addr=offset,
+                i_op=MemOp.DOUBLE,
+                i_is_load=is_load,
+                i_is_store=not is_load,
+                o_error=1,
+            )
+
+
 @cocotb.test()
 async def invalid_op_reports_error(dut):
     await setup(dut)
 
     dut.i_is_load.value = 1
-    for op in (0b011, 0b110, 0b111):
+    invalid_load_ops = (0b111,) if WIDTH >= 64 else (0b011, 0b110, 0b111)
+    for op in invalid_load_ops:
         dut.i_op.value = op
         await _check(dut, i_op=op, i_is_load=1, o_error=1)
 
     dut.i_is_load.value = 0
     dut.i_is_store.value = 1
-    for op in range(0b011, 0b1000):
+    first_invalid_store_op = 0b100 if WIDTH >= 64 else 0b011
+    for op in range(first_invalid_store_op, 0b1000):
         dut.i_op.value = op
         await _check(dut, i_op=op, i_is_store=1, o_error=1)
 

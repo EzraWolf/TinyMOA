@@ -10,7 +10,7 @@ pub module ecore_alu #(
     o_res: output logic<WIDTH>,
 ) {
     var result: logic<WIDTH>;
-    let shamt: logic<$clog2(WIDTH)> = i_b[$clog2(WIDTH) - 1:0];
+    let shamt : logic<$clog2(WIDTH)> = i_b[$clog2(WIDTH) - 1:0];
 
     always_comb {
         case (i_op) {
@@ -36,9 +36,9 @@ pub module ecore_alu #(
 
         let add32: logic<32> = i_a32 + i_b32;
         let sub32: logic<32> = i_a32 - i_b32;
-        let sll32: logic<32> = i_a32 << shamt;
-        let srl32: logic<32> = i_a32 >> shamt;
-        let sra32: logic<32> = $signed(i_a32) >>> shamt;
+        let sll32: logic<32> = i_a32 << shamt[4:0];
+        let srl32: logic<32> = i_a32 >> shamt[4:0];
+        let sra32: logic<32> = $signed(i_a32) >>> shamt[4:0];
 
         always_comb {
             case (i_op) {

@@ -36,6 +36,14 @@ pub module ecore_lsu #(
                     o_wmask = {1'b0 repeat WIDTH / 8 - 4, 4'b1111} << byte_offset;
                     o_error = i_addr[1:0] != 0;
                 }
+                3'b011: { // SD
+                    if WIDTH >= 64 {
+                        o_wmask = '1;
+                        o_error = i_addr[2:0] != 0;
+                    } else {
+                        o_error = 1'b1;
+                    }
+                }
                 default: o_error = 1'b1;
             }
         }
@@ -59,6 +67,22 @@ pub module ecore_lsu #(
                 3'b101: { // LHU
                     o_load_data = {1'b0 repeat WIDTH - 16, shifted_rdata[15:0]};
                     o_error = i_addr[0];
+                }
+                3'b011: { // LD
+                    if WIDTH >= 64 {
+                        o_load_data = shifted_rdata;
+                        o_error = i_addr[2:0] != 0;
+                    } else {
+                        o_error = 1'b1;
+                    }
+                }
+                3'b110: { // LWU
+                    if WIDTH >= 64 {
+                        o_load_data = {1'b0 repeat WIDTH - 32, shifted_rdata[31:0]};
+                        o_error = i_addr[1:0] != 0;
+                    } else {
+                        o_error = 1'b1;
+                    }
                 }
                 default: o_error = 1'b1;
             }

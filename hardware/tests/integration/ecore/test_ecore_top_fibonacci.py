@@ -87,8 +87,10 @@ async def fibonacci(dut):
 @pytest.mark.parametrize(
     "p",
     [
-        {"XLEN": 32, "ARCH_REGFILE_NUM": 32},
-        {"XLEN": 64, "ARCH_REGFILE_NUM": 32},
+        {"WIDTH": 32, "DEPTH": 16},
+        {"WIDTH": 64, "DEPTH": 16},
+        {"WIDTH": 32, "DEPTH": 32},
+        {"WIDTH": 64, "DEPTH": 32},
     ],
 )
 def test_ecore_top_fibonacci(p):
