@@ -3,7 +3,7 @@
 pub package ecore_pkg_cfg {
     const XLEN: u32 = 32; // 32 or 64 ONLY!!
 
-    const USE_LINUX: bbool = true;
+    const USE_LINUX : bbool = true;
 
     const USE_BASE_I: bbool = true || USE_LINUX;
     const USE_BASE_E: bbool = false && !USE_BASE_I;
@@ -59,4 +59,50 @@ pub package ecore_pkg_cfg {
     // const FPU_NUM: u32 = 2;
     // const VPU_NUM: u32 = 2;
     // const AGU_NUM: u32 = 2;
+}
+
+pub module ecore_cfg (
+    o_xlen            : output logic<32>,
+    o_flen            : output logic<32>,
+    o_ialign          : output logic<32>,
+    o_arch_regfile_num: output logic<32>,
+    o_use_linux       : output logic,
+    o_use_base_i      : output logic,
+    o_use_base_e      : output logic,
+    o_use_ext_zfbfmin : output logic,
+    o_use_ext_zifencei: output logic,
+    o_use_ext_zicond  : output logic,
+    o_use_ext_zcb     : output logic,
+    o_use_ext_zbb     : output logic,
+    o_use_ext_c       : output logic,
+    o_use_ext_zca     : output logic,
+    o_use_ext_d       : output logic,
+    o_use_ext_f       : output logic,
+    o_use_ext_zicsr   : output logic,
+    o_use_ext_a       : output logic,
+    o_use_ext_m       : output logic,
+    o_use_mmu_sv32    : output logic,
+    o_use_mmu_sv39    : output logic,
+) {
+    assign o_xlen             = ecore_pkg_cfg::XLEN;
+    assign o_flen             = ecore_pkg_cfg::FLEN;
+    assign o_ialign           = ecore_pkg_cfg::IALIGN;
+    assign o_arch_regfile_num = ecore_pkg_cfg::ARCH_REGFILE_NUM;
+    assign o_use_linux        = ecore_pkg_cfg::USE_LINUX;
+    assign o_use_base_i       = ecore_pkg_cfg::USE_BASE_I;
+    assign o_use_base_e       = ecore_pkg_cfg::USE_BASE_E;
+    assign o_use_ext_zfbfmin  = ecore_pkg_cfg::USE_EXT_Zfbfmin;
+    assign o_use_ext_zifencei = ecore_pkg_cfg::USE_EXT_Zifencei;
+    assign o_use_ext_zicond   = ecore_pkg_cfg::USE_EXT_Zicond;
+    assign o_use_ext_zcb      = ecore_pkg_cfg::USE_EXT_Zcb;
+    assign o_use_ext_zbb      = ecore_pkg_cfg::USE_EXT_Zbb;
+    assign o_use_ext_c        = ecore_pkg_cfg::USE_EXT_C;
+    assign o_use_ext_zca      = ecore_pkg_cfg::USE_EXT_Zca;
+    assign o_use_ext_d        = ecore_pkg_cfg::USE_EXT_D;
+    assign o_use_ext_f        = ecore_pkg_cfg::USE_EXT_F;
+    assign o_use_ext_zicsr    = ecore_pkg_cfg::USE_EXT_Zicsr;
+    assign o_use_ext_a        = ecore_pkg_cfg::USE_EXT_A;
+    assign o_use_ext_m        = ecore_pkg_cfg::USE_EXT_M;
+    assign o_use_mmu_sv32     = ecore_pkg_cfg::USE_MMU_Sv32;
+    assign o_use_mmu_sv39     = ecore_pkg_cfg::USE_MMU_Sv39;
 }
