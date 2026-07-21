@@ -4,22 +4,21 @@
 pub package ecore_pkg_alu {
     enum AluOp: logic<4> {
         ADD = 4'b0000,
-        ADDW = 4'b0001,
-        SUB = 4'b0010,
-        SUBW = 4'b0011,
-
-        OR = 4'b0100,
+        SUB = 4'b0001,
+        SLL = 4'b0010,
+        SRL = 4'b0011,
+        SRA = 4'b0100,
         AND = 4'b0101,
-        XOR = 4'b0110,
+        OR  = 4'b0110,
+        XOR = 4'b0111,
 
-        SLT = 4'b0111,
-        SLTU = 4'b1000,
-
-        SLL = 4'b1001,
+        ADDW = 4'b1000,
+        SUBW = 4'b1001,
         SLLW = 4'b1010,
-        SRL = 4'b1011,
-        SRLW = 4'b1100,
-        SRA = 4'b1101,
-        SRAW = 4'b1110,
+        SRLW = 4'b1011,
+        SRAW = 4'b1100,
+
+        SLT  = 4'b1101,
+        SLTU = 4'b1110,
     }
 }
