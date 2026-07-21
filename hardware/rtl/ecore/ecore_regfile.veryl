@@ -14,18 +14,20 @@ pub module ecore_regfile #(
     i_raddr: input  logic<$clog2(DEPTH)> [R_PORTS],
     o_rdata: output logic       <WIDTH>  [R_PORTS],
 ) {
-    var regs: logic<WIDTH> [DEPTH]; // assumes x0 hardwired to 0x0
+    // no reset significantly reduces size
+    // x0 writes w/ LUTRAM dont change, saving size
+    type t_reg = bit<WIDTH>;
+    var regs: t_reg [DEPTH];
 
-    // no reset significantly reduces CPU size
     always_ff (clk) {
         for i in 0..W_PORTS {
             if i_wen[i] && i_waddr[i] != 0 {
-                regs[i_waddr[i]] = i_wdata[i];
+                regs[i_waddr[i]] = i_wdata[i] as t_reg;
             }
         }
     }
 
     for i in 0..R_PORTS :gen_read_ports {
-        assign o_rdata[i] = if (i_raddr[i] != 0) ? regs[i_raddr[i]] : '0;
+        assign o_rdata[i] = regs[i_raddr[i]];
     }
 }
