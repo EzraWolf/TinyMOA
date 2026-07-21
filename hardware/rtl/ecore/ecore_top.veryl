@@ -2,28 +2,28 @@ import ecore_pkg_cfg::*;
 import ecore_pkg_alu::*;
 
 pub module ecore_top #(
-    param WIDTH: u32 = 32,
-    param DEPTH: u32 = 32,
+    param XLEN            : u32 = XLEN,
+    param ARCH_REGFILE_NUM: u32 = ARCH_REGFILE_NUM,
 ) (
     clk: input clock,
     rst: input reset,
 
     o_imem_valid: output logic,
     i_imem_ready: input  logic,
-    o_imem_addr : output logic<WIDTH>,
+    o_imem_addr : output logic<XLEN>,
     i_imem_rdata: input  logic<32>,
 
     o_dmem_valid: output logic,
     i_dmem_ready: input  logic,
     o_dmem_ren  : output logic,
     o_dmem_wen  : output logic,
-    o_dmem_addr : output logic<WIDTH>,
-    o_dmem_wdata: output logic<WIDTH>,
-    o_dmem_wmask: output logic<WIDTH / 8>,
-    i_dmem_rdata: input  logic<WIDTH>,
+    o_dmem_addr : output logic<XLEN>,
+    o_dmem_wdata: output logic<XLEN>,
+    o_dmem_wmask: output logic<XLEN / 8>,
+    i_dmem_rdata: input  logic<XLEN>,
 
     o_valid     : output logic,
-    o_pc        : output logic<WIDTH>,
+    o_pc        : output logic<XLEN>,
     o_is_fence  : output logic,
     o_is_ecall  : output logic,
     o_is_ebreak : output logic,
@@ -32,16 +32,16 @@ pub module ecore_top #(
 ) {
     var fetch_valid: logic;
     var fetch_ready: logic;
-    var fetch_pc   : logic<WIDTH>;
+    var fetch_pc   : logic<XLEN>;
     var fetch_instr: logic<32>;
 
     var decode_valid     : logic;
     var decode_ready     : logic;
-    var decode_pc        : logic<WIDTH>;
+    var decode_pc        : logic<XLEN>;
     var decode_fu_op     : AluOp;
-    var decode_fu_data1  : logic<WIDTH>;
-    var decode_fu_data2  : logic<WIDTH>;
-    var decode_imm       : logic<WIDTH>;
+    var decode_fu_data1  : logic<XLEN>;
+    var decode_fu_data2  : logic<XLEN>;
+    var decode_imm       : logic<XLEN>;
     var decode_funct3    : logic<3>;
     var decode_is_branch : logic;
     var decode_is_jump   : logic;
@@ -51,15 +51,15 @@ pub module ecore_top #(
     var decode_is_illegal: logic;
     var decode_mem_ren   : logic;
     var decode_mem_wen   : logic;
-    var decode_store_data: logic<WIDTH>;
+    var decode_store_data: logic<XLEN>;
     var decode_wb_sel    : WbSel;
     var decode_rf_wen    : logic;
-    var decode_rf_dst    : logic<$clog2(DEPTH)>;
+    var decode_rf_dst    : logic<$clog2(ARCH_REGFILE_NUM)>;
 
     var execute_valid     : logic;
     var execute_ready     : logic;
-    var execute_pc        : logic<WIDTH>;
-    var execute_fu_data   : logic<WIDTH>;
+    var execute_pc        : logic<XLEN>;
+    var execute_fu_data   : logic<XLEN>;
     var execute_funct3    : logic<3>;
     var execute_is_fence  : logic;
     var execute_is_ecall  : logic;
@@ -67,18 +67,18 @@ pub module ecore_top #(
     var execute_is_illegal: logic;
     var execute_mem_ren   : logic;
     var execute_mem_wen   : logic;
-    var execute_store_data: logic<WIDTH>;
+    var execute_store_data: logic<XLEN>;
     var execute_wb_sel    : WbSel;
     var execute_rf_wen    : logic;
-    var execute_rf_dst    : logic<$clog2(DEPTH)>;
+    var execute_rf_dst    : logic<$clog2(ARCH_REGFILE_NUM)>;
     var redirect_valid    : logic;
-    var redirect_pc       : logic<WIDTH>;
+    var redirect_pc       : logic<XLEN>;
 
     var memory_valid     : logic;
     var memory_ready     : logic;
-    var memory_pc        : logic<WIDTH>;
-    var memory_fu_data   : logic<WIDTH>;
-    var memory_load_data : logic<WIDTH>;
+    var memory_pc        : logic<XLEN>;
+    var memory_fu_data   : logic<XLEN>;
+    var memory_load_data : logic<XLEN>;
     var memory_is_fence  : logic;
     var memory_is_ecall  : logic;
     var memory_is_ebreak : logic;
@@ -86,13 +86,15 @@ pub module ecore_top #(
     var memory_error     : logic;
     var memory_wb_sel    : WbSel;
     var memory_rf_wen    : logic;
-    var memory_rf_dst    : logic<$clog2(DEPTH)>;
+    var memory_rf_dst    : logic<$clog2(ARCH_REGFILE_NUM)>;
 
     var writeback_rf_wen : logic;
-    var writeback_rf_dst : logic<$clog2(DEPTH)>;
-    var writeback_rf_data: logic<WIDTH>;
+    var writeback_rf_dst : logic<$clog2(ARCH_REGFILE_NUM)>;
+    var writeback_rf_data: logic<XLEN>;
 
-    inst u_fetch: ecore_stage_fetch #(WIDTH) (
+    inst u_fetch: ecore_stage_fetch #(
+        WIDTH: XLEN,
+    ) (
         clk, rst,
         i_valid     : redirect_valid,
         i_pc        : redirect_pc,
@@ -106,7 +108,10 @@ pub module ecore_top #(
         o_instr     : fetch_instr,
     );
 
-    inst u_decode: ecore_stage_decode #(WIDTH, DEPTH) (
+    inst u_decode: ecore_stage_decode #(
+        WIDTH: XLEN,
+        DEPTH: ARCH_REGFILE_NUM,
+    ) (
         clk, rst,
         i_flush     : redirect_valid,
         i_valid     : fetch_valid,
@@ -142,7 +147,10 @@ pub module ecore_top #(
         o_rf_dst    : decode_rf_dst,
     );
 
-    inst u_execute: ecore_stage_execute #(WIDTH, DEPTH) (
+    inst u_execute: ecore_stage_execute #(
+        WIDTH: XLEN,
+        DEPTH: ARCH_REGFILE_NUM,
+    ) (
         clk, rst,
         i_flush     : 1'b0,
         i_valid     : decode_valid && !redirect_valid,
@@ -184,7 +192,10 @@ pub module ecore_top #(
         o_redirect_pc   : redirect_pc,
     );
 
-    inst u_memory: ecore_stage_memory #(WIDTH, DEPTH) (
+    inst u_memory: ecore_stage_memory #(
+        WIDTH: XLEN,
+        DEPTH: ARCH_REGFILE_NUM,
+    ) (
         clk, rst,
         i_flush     : 1'b0,
         i_valid     : execute_valid,
@@ -225,7 +236,10 @@ pub module ecore_top #(
         o_rf_dst    : memory_rf_dst,
     );
 
-    inst u_writeback: ecore_stage_writeback #(WIDTH, DEPTH) (
+    inst u_writeback: ecore_stage_writeback #(
+        WIDTH: XLEN,
+        DEPTH: ARCH_REGFILE_NUM,
+    ) (
         i_valid     : memory_valid,
         o_ready     : memory_ready,
         i_pc        : memory_pc,
