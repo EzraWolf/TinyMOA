@@ -1,4 +1,4 @@
-import ecore_pkg_cpu::*;
+import ecore_pkg_cfg::*;
 import ecore_pkg_alu::*;
 
 pub module ecore_stage_decode #(
@@ -14,10 +14,10 @@ pub module ecore_stage_decode #(
     i_pc        : input  logic<WIDTH>,
     i_instr     : input  logic<32>,
 
-    i_ex_rf_wen : input logic,
-    i_ex_rf_dst : input logic<$clog2(DEPTH)>,
-    i_mem_rf_wen: input logic,
-    i_mem_rf_dst: input logic<$clog2(DEPTH)>,
+    i_ex_rf_wen : input  logic,
+    i_ex_rf_dst : input  logic<$clog2(DEPTH)>,
+    i_mem_rf_wen: input  logic,
+    i_mem_rf_dst: input  logic<$clog2(DEPTH)>,
 
     i_wb_wen    : input  logic,
     i_wb_dst    : input  logic<$clog2(DEPTH)>,
@@ -75,7 +75,7 @@ pub module ecore_stage_decode #(
     let ext_imm: logic<WIDTH> = {dec_imm[msb] repeat WIDTH - 32, dec_imm};
     let output_ready: logic = !o_valid || i_ready;
 
-    inst u_decoder: ecore_decoder (
+    inst u_decoder: ecore_decoder #(WIDTH) (
         i_instr,
         o_rf_wen    : dec_rf_wen,
         o_rf_dst    : dec_rf_dst,

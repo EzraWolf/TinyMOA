@@ -636,7 +636,7 @@ def test_ecore_stage_memory(p):
         "ecore",
         "stage_memory",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/ecore_lsu.sv",
             "~ecore/stages/ecore_stage_memory.sv",
         ],

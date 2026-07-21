@@ -3,59 +3,100 @@ import ecore_pkg_alu::*;
 pub module ecore_alu #(
     param WIDTH: u32 = 32,
 ) (
-    i_op: input ecore_pkg_alu::AluOp,
-
-    i_a: input logic<WIDTH>,
-    i_b: input logic<WIDTH>,
+    i_op : input  AluOp,
+    i_a  : input  logic<WIDTH>,
+    i_b  : input  logic<WIDTH>,
 
     o_res: output logic<WIDTH>,
 ) {
+    var result    : logic<WIDTH>;
+    var real_op   : AluOp;
+    var real_a    : logic<WIDTH>;
+    var real_shamt: logic<$clog2(WIDTH)>;
+    var is_word   : logic;
+    var shift_in  : logic<WIDTH>;
+    var shift_out : logic<WIDTH>;
 
-    var result: logic<WIDTH>;
+    let shamt : logic<$clog2(WIDTH)> = i_b[$clog2(WIDTH) - 1:0];
+    let do_sub: logic = real_op == AluOp::SUB
+                     || real_op == AluOp::SLT
+                     || real_op == AluOp::SLTU;
 
-    let shamt: logic<$clog2(WIDTH)> = i_b[$clog2(WIDTH) - 1:0];
+    let do_sll: logic = real_op == AluOp::SLL;
+    let do_sra: logic = real_op == AluOp::SRA;
 
-    always_comb {
-        case (i_op) {
-            AluOp::ADD : result = i_a + i_b;
-            AluOp::SUB : result = i_a - i_b;
-            AluOp::AND : result = i_a & i_b;
-            AluOp::OR  : result = i_a | i_b;
-            AluOp::XOR : result = i_a ^ i_b;
-            AluOp::SLL : result = i_a << shamt;
-            AluOp::SRL : result = i_a >> shamt;
-            AluOp::SRA : result = $signed(i_a) >>> shamt;
-            AluOp::SLT : result = {1'b0 repeat (WIDTH - 'b1), $signed(i_a) <: $signed(i_b)};
-            AluOp::SLTU: result = {1'b0 repeat (WIDTH - 'b1), i_a <: i_b};
-            default    : result = '0;
-        }
+    let addsub: logic<WIDTH + 1> = {1'b0, real_a}
+                                 + {1'b0, i_b ^ {do_sub repeat WIDTH}}
+                                 + {1'b0 repeat WIDTH, do_sub};
+    let shift_ext: logic<WIDTH + 1> = {do_sra && shift_in[WIDTH - 1], shift_in};
+    let shifted  : logic<WIDTH + 1> = $signed(shift_ext) >>> real_shamt;
+
+    for i in 0..WIDTH :gen_shift_bits {
+        assign shift_in[i] = if (do_sll) ? real_a[WIDTH - 1 - i] : real_a[i];
+        assign shift_out[i] = if (do_sll) ? shifted[WIDTH - 1 - i] : shifted[i];
     }
 
     if (WIDTH >= 64) :gen_w_ops {
-        var w_result: logic<WIDTH>;
-
-        let i_a32: logic<32> = i_a[31:0];
-        let i_b32: logic<32> = i_b[31:0];
-
-        let add32: logic<32> = i_a32 + i_b32;
-        let sub32: logic<32> = i_a32 - i_b32;
-        let sll32: logic<32> = i_a32 << shamt;
-        let srl32: logic<32> = i_a32 >> shamt;
-        let sra32: logic<32> = $signed(i_a32) >>> shamt;
-
         always_comb {
-            case (i_op) {
-                AluOp::ADDW: w_result = {add32[msb] repeat WIDTH - 32, add32};
-                AluOp::SUBW: w_result = {sub32[msb] repeat WIDTH - 32, sub32};
-                AluOp::SLLW: w_result = {sll32[msb] repeat WIDTH - 32, sll32};
-                AluOp::SRLW: w_result = {srl32[msb] repeat WIDTH - 32, srl32};
-                AluOp::SRAW: w_result = {sra32[msb] repeat WIDTH - 32, sra32};
-                default    : w_result = '0;
+            real_op    = i_op;
+            real_a     = i_a;
+            real_shamt = shamt;
+            is_word    = 1'b0;
+
+            if i_op[3] && (!i_op[2] || (!i_op[1] && !i_op[0])) {
+                is_word = 1'b1;
+
+                case (i_op[2:0]) {
+                    3'b000: real_op = AluOp::ADD;
+                    3'b001: real_op = AluOp::SUB;
+                    3'b010: {
+                        real_op    = AluOp::SLL;
+                        real_a     = {1'b0 repeat WIDTH - 32, i_a[31:0]};
+                        real_shamt = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
+                    }
+                    3'b011: {
+                        real_op    = AluOp::SRL;
+                        real_a     = {1'b0 repeat WIDTH - 32, i_a[31:0]};
+                        real_shamt = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
+                    }
+                    3'b100: {
+                        real_op    = AluOp::SRA;
+                        real_a     = {i_a[31] repeat WIDTH - 32, i_a[31:0]};
+                        real_shamt = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
+                    }
+                    default: {}
+                }
             }
         }
 
-        assign o_res = result | w_result;
+        assign o_res = if (is_word) ? {result[31] repeat WIDTH - 32, result[31:0]} : result;
     } else :gen_no_w_ops {
+        always_comb {
+            real_op    = i_op;
+            real_a     = i_a;
+            real_shamt = shamt;
+            is_word    = 1'b0;
+        }
+
         assign o_res = result;
+    }
+
+    always_comb {
+        case (real_op) {
+            AluOp::ADD : result = addsub[WIDTH - 1:0];
+            AluOp::SUB : result = addsub[WIDTH - 1:0];
+            AluOp::AND : result = real_a & i_b;
+            AluOp::OR  : result = real_a | i_b;
+            AluOp::XOR : result = real_a ^ i_b;
+            AluOp::SLL : result = shift_out;
+            AluOp::SRL : result = shift_out;
+            AluOp::SRA : result = shift_out;
+            AluOp::SLT : result = {
+                1'b0 repeat (WIDTH - 'b1),
+                if real_a[WIDTH - 1] != i_b[WIDTH - 1] ? real_a[WIDTH - 1] : addsub[WIDTH - 1]
+            };
+            AluOp::SLTU: result = {1'b0 repeat (WIDTH - 'b1), !addsub[WIDTH]};
+            default    : result = '0;
+        }
     }
 }

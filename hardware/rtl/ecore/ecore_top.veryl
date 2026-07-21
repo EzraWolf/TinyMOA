@@ -1,9 +1,9 @@
-import ecore_pkg_cpu::*;
+import ecore_pkg_cfg::*;
 import ecore_pkg_alu::*;
 
 pub module ecore_top #(
-    param WIDTH: u32 = 32,
-    param DEPTH: u32 = 32,
+    param WIDTH: u32 = XLEN,
+    param DEPTH: u32 = ARCH_REGFILE_NUM,
 ) (
     clk: input clock,
     rst: input reset,

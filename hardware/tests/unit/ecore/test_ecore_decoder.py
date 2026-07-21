@@ -1,4 +1,6 @@
+import os
 import cocotb
+import pytest
 from random import randint
 from cocotb.triggers import Timer
 
@@ -6,6 +8,9 @@ from tests import CHECK_DELAY_NS, N_FUZZ
 from tests.common import encode_rv32i as rv32i
 from tests.common.cpu_types import AluOp, FuSrc1, FuSrc2, WbSel
 from tests.runner import run
+
+
+WIDTH = int(os.environ.get("WIDTH", 32))
 
 
 async def _check(
@@ -300,6 +305,83 @@ async def srai(dut):
     await _shift_type(dut, rv32i.encode_srai, AluOp.SRA, 0b101, 0x400)
 
 
+@cocotb.test(skip=(WIDTH < 64))
+async def rv64_shift_immediates_use_six_bit_shamt(dut):
+    for funct3, upper, fu_op in (
+        (0b001, 0x000, AluOp.SLL),
+        (0b101, 0x000, AluOp.SRL),
+        (0b101, 0x400, AluOp.SRA),
+    ):
+        instr = rv32i.encode_i_type(upper | 40, 1, funct3, 2, 0x13)
+        dut.i_instr.value = instr
+        await _check(
+            dut,
+            i_instr=instr,
+            o_rf_wen=1,
+            o_rf_dst=2,
+            o_rf_src1=1,
+            o_fu_op=fu_op,
+            o_fu_src1=FuSrc1.REG,
+            o_fu_src2=FuSrc2.IMM,
+            o_imm=upper | 40,
+            o_wb_sel=WbSel.FU,
+            o_funct3=funct3,
+        )
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def op_imm_32(dut):
+    cases = (
+        (0b000, -1, AluOp.ADDW),
+        (0b001, 31, AluOp.SLLW),
+        (0b101, 31, AluOp.SRLW),
+        (0b101, 0x400 | 31, AluOp.SRAW),
+    )
+    for funct3, imm, fu_op in cases:
+        instr = rv32i.encode_i_type(imm, 1, funct3, 2, 0x1B)
+        dut.i_instr.value = instr
+        await _check(
+            dut,
+            i_instr=instr,
+            o_rf_wen=1,
+            o_rf_dst=2,
+            o_rf_src1=1,
+            o_fu_op=fu_op,
+            o_fu_src1=FuSrc1.REG,
+            o_fu_src2=FuSrc2.IMM,
+            o_imm=imm & 0xFFFF_FFFF,
+            o_wb_sel=WbSel.FU,
+            o_funct3=funct3,
+        )
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def op_32(dut):
+    cases = (
+        (0x00, 0b000, AluOp.ADDW),
+        (0x20, 0b000, AluOp.SUBW),
+        (0x00, 0b001, AluOp.SLLW),
+        (0x00, 0b101, AluOp.SRLW),
+        (0x20, 0b101, AluOp.SRAW),
+    )
+    for funct7, funct3, fu_op in cases:
+        instr = rv32i.encode_r_type(funct7, 3, 1, funct3, 2, 0x3B)
+        dut.i_instr.value = instr
+        await _check(
+            dut,
+            i_instr=instr,
+            o_rf_wen=1,
+            o_rf_dst=2,
+            o_rf_src1=1,
+            o_rf_src2=3,
+            o_fu_op=fu_op,
+            o_fu_src1=FuSrc1.REG,
+            o_fu_src2=FuSrc2.REG,
+            o_wb_sel=WbSel.FU,
+            o_funct3=funct3,
+        )
+
+
 @cocotb.test()
 async def lb(dut):
     await _load(dut, rv32i.encode_lb, 0b000)
@@ -325,6 +407,20 @@ async def lhu(dut):
     await _load(dut, rv32i.encode_lhu, 0b101)
 
 
+@cocotb.test(skip=(WIDTH < 64))
+async def ld(dut):
+    await _load(
+        dut, lambda rd, rs1, imm: rv32i.encode_i_type(imm, rs1, 0b011, rd, 0x03), 0b011
+    )
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def lwu(dut):
+    await _load(
+        dut, lambda rd, rs1, imm: rv32i.encode_i_type(imm, rs1, 0b110, rd, 0x03), 0b110
+    )
+
+
 @cocotb.test()
 async def sb(dut):
     await _store(dut, rv32i.encode_sb, 0b000)
@@ -338,6 +434,15 @@ async def sh(dut):
 @cocotb.test()
 async def sw(dut):
     await _store(dut, rv32i.encode_sw, 0b010)
+
+
+@cocotb.test(skip=(WIDTH < 64))
+async def sd(dut):
+    await _store(
+        dut,
+        lambda rs1, rs2, imm: rv32i.encode_s_type(imm, rs2, rs1, 0b011, 0x23),
+        0b011,
+    )
 
 
 @cocotb.test()
@@ -458,6 +563,8 @@ async def illegal_quadrant(dut):
 @cocotb.test()
 async def illegal_opcode(dut):
     valid = {0x00, 0x03, 0x04, 0x05, 0x08, 0x0C, 0x0D, 0x18, 0x19, 0x1B, 0x1C}
+    if WIDTH >= 64:
+        valid |= {0x06, 0x0E}
     for op in set(range(32)) - valid:
         instr = (randint(0, (1 << 25) - 1) << 7) | (op << 2) | 0b11
         dut.i_instr.value = instr
@@ -495,7 +602,9 @@ async def illegal_r_type(dut):
 
 @cocotb.test()
 async def illegal_shift(dut):
-    for funct3, legal in ((0b001, {0x00}), (0b101, {0x00, 0x20})):
+    legal_sll = {0x00, 0x01} if WIDTH >= 64 else {0x00}
+    legal_sr = {0x00, 0x01, 0x20, 0x21} if WIDTH >= 64 else {0x00, 0x20}
+    for funct3, legal in ((0b001, legal_sll), (0b101, legal_sr)):
         for funct7 in set(range(128)) - legal:
             instr = rv32i.encode_i_type(funct7 << 5, 1, funct3, 2, 0x13)
             dut.i_instr.value = instr
@@ -504,7 +613,8 @@ async def illegal_shift(dut):
 
 @cocotb.test()
 async def illegal_load(dut):
-    for funct3 in (0b011, 0b110, 0b111):
+    illegal = (0b111,) if WIDTH >= 64 else (0b011, 0b110, 0b111)
+    for funct3 in illegal:
         instr = rv32i.encode_i_type(0, 1, funct3, 2, 0x03)
         dut.i_instr.value = instr
         await _check(dut, i_instr=instr, o_funct3=funct3, o_is_illegal=1)
@@ -512,7 +622,8 @@ async def illegal_load(dut):
 
 @cocotb.test()
 async def illegal_store(dut):
-    for funct3 in range(0b011, 0b1000):
+    first_illegal = 0b100 if WIDTH >= 64 else 0b011
+    for funct3 in range(first_illegal, 0b1000):
         instr = rv32i.encode_s_type(0, 2, 1, funct3, 0x23)
         dut.i_instr.value = instr
         await _check(dut, i_instr=instr, o_funct3=funct3, o_is_illegal=1)
@@ -550,14 +661,15 @@ async def illegal_system(dut):
         await _check(dut, i_instr=instr, o_funct3=funct3, o_is_illegal=1)
 
 
-def test_ecore_decoder_rv32i():
+@pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
+def test_ecore_decoder(p):
     run(
         "ecore",
         "decoder",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/pkgs/ecore_pkg_alu.sv",
             "~ecore/ecore_decoder.sv",
         ],
-        test_name="rv32i",
+        params=p,
     )

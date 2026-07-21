@@ -344,7 +344,7 @@ def test_ecore_stage_writeback(p):
         "ecore",
         "stage_writeback",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/stages/ecore_stage_writeback.sv",
         ],
         params=p,

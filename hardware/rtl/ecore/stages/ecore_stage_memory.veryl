@@ -1,4 +1,4 @@
-import ecore_pkg_cpu::*;
+import ecore_pkg_cfg::*;
 
 pub module ecore_stage_memory #(
     param WIDTH: u32 = 32,

@@ -529,7 +529,7 @@ def test_ecore_stage_execute(p):
         "ecore",
         "stage_execute",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/pkgs/ecore_pkg_alu.sv",
             "~ecore/ecore_alu.sv",
             "~ecore/ecore_bru.sv",

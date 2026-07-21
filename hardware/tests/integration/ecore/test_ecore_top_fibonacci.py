@@ -87,6 +87,8 @@ async def fibonacci(dut):
 @pytest.mark.parametrize(
     "p",
     [
+        {"WIDTH": 32, "DEPTH": 16},
+        {"WIDTH": 64, "DEPTH": 16},
         {"WIDTH": 32, "DEPTH": 32},
         {"WIDTH": 64, "DEPTH": 32},
     ],
@@ -96,7 +98,7 @@ def test_ecore_top_fibonacci(p):
         "ecore",
         "top",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/pkgs/ecore_pkg_alu.sv",
             "~ecore/ecore_alu.sv",
             "~ecore/ecore_bru.sv",

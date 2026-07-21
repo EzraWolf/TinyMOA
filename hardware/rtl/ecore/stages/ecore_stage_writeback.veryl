@@ -1,4 +1,4 @@
-import ecore_pkg_cpu::*;
+import ecore_pkg_cfg::*;
 
 pub module ecore_stage_writeback #(
     param WIDTH: u32 = 32,
@@ -15,9 +15,9 @@ pub module ecore_stage_writeback #(
     i_is_illegal: input  logic,
     i_mem_error : input  logic,
 
-    i_wb_sel    : input WbSel,
-    i_rf_wen    : input logic,
-    i_rf_dst    : input logic<$clog2(DEPTH)>,
+    i_wb_sel    : input  WbSel,
+    i_rf_wen    : input  logic,
+    i_rf_dst    : input  logic<$clog2(DEPTH)>,
 
     o_rf_wen    : output logic,
     o_rf_dst    : output logic<$clog2(DEPTH)>,

@@ -659,7 +659,7 @@ def test_ecore_stage_decode(p):
         "ecore",
         "stage_decode",
         [
-            "~ecore/pkgs/ecore_pkg_cpu.sv",
+            "~ecore/pkgs/ecore_pkg_cfg.sv",
             "~ecore/pkgs/ecore_pkg_alu.sv",
             "~ecore/ecore_decoder.sv",
             "~ecore/ecore_regfile.sv",
