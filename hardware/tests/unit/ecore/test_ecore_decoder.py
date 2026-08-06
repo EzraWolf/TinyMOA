@@ -11,6 +11,7 @@ from tests.runner import run
 
 
 WIDTH = int(os.environ.get("WIDTH", 32))
+REG_NUM = int(os.environ.get("REG_NUM", 32))
 
 
 async def _check(
@@ -63,9 +64,9 @@ async def _check(
 
 async def _r_type(dut, encode, fu_op):
     for _ in range(N_FUZZ):
-        rd = randint(0, 31)
-        rs1 = randint(0, 31)
-        rs2 = randint(0, 31)
+        rd = randint(0, REG_NUM - 1)
+        rs1 = randint(0, REG_NUM - 1)
+        rs2 = randint(0, REG_NUM - 1)
         instr = encode(rd, rs1, rs2)
         dut.i_instr.value = instr
         await _check(
@@ -85,8 +86,8 @@ async def _r_type(dut, encode, fu_op):
 
 async def _i_type(dut, encode, fu_op, funct3):
     for _ in range(N_FUZZ):
-        rd = randint(0, 31)
-        rs1 = randint(0, 31)
+        rd = randint(0, REG_NUM - 1)
+        rs1 = randint(0, REG_NUM - 1)
         imm = randint(-2048, 2047)
         instr = encode(rd, rs1, imm)
         dut.i_instr.value = instr
@@ -107,8 +108,8 @@ async def _i_type(dut, encode, fu_op, funct3):
 
 async def _shift_type(dut, encode, fu_op, funct3, upper=0):
     for _ in range(N_FUZZ):
-        rd = randint(0, 31)
-        rs1 = randint(0, 31)
+        rd = randint(0, REG_NUM - 1)
+        rs1 = randint(0, REG_NUM - 1)
         shamt = randint(0, 31)
         instr = encode(rd, rs1, shamt)
         dut.i_instr.value = instr
@@ -129,8 +130,8 @@ async def _shift_type(dut, encode, fu_op, funct3, upper=0):
 
 async def _load(dut, encode, funct3):
     for _ in range(N_FUZZ):
-        rd = randint(0, 31)
-        rs1 = randint(0, 31)
+        rd = randint(0, REG_NUM - 1)
+        rs1 = randint(0, REG_NUM - 1)
         imm = randint(-2048, 2047)
         instr = encode(rd, rs1, imm)
         dut.i_instr.value = instr
@@ -152,8 +153,8 @@ async def _load(dut, encode, funct3):
 
 async def _store(dut, encode, funct3):
     for _ in range(N_FUZZ):
-        rs1 = randint(0, 31)
-        rs2 = randint(0, 31)
+        rs1 = randint(0, REG_NUM - 1)
+        rs2 = randint(0, REG_NUM - 1)
         imm = randint(-2048, 2047)
         instr = encode(rs1, rs2, imm)
         dut.i_instr.value = instr
@@ -173,8 +174,8 @@ async def _store(dut, encode, funct3):
 
 async def _branch(dut, encode, funct3):
     for _ in range(N_FUZZ):
-        rs1 = randint(0, 31)
-        rs2 = randint(0, 31)
+        rs1 = randint(0, REG_NUM - 1)
+        rs2 = randint(0, REG_NUM - 1)
         imm = randint(-2048, 2047) * 2
         instr = encode(rs1, rs2, imm)
         dut.i_instr.value = instr
@@ -193,7 +194,7 @@ async def _branch(dut, encode, funct3):
 
 async def _u_type(dut, encode, fu_src1):
     for _ in range(N_FUZZ):
-        rd = randint(0, 31)
+        rd = randint(0, REG_NUM - 1)
         imm = randint(0, 0xF_FFFF)
         instr = encode(rd, imm)
         dut.i_instr.value = instr
@@ -488,7 +489,7 @@ async def auipc(dut):
 @cocotb.test()
 async def jal(dut):
     for _ in range(N_FUZZ):
-        rd = randint(0, 31)
+        rd = randint(0, REG_NUM - 1)
         imm = randint(-(1 << 19), (1 << 19) - 1) * 2
         instr = rv32i.encode_jal(rd, imm)
         dut.i_instr.value = instr
@@ -509,8 +510,8 @@ async def jal(dut):
 @cocotb.test()
 async def jalr(dut):
     for _ in range(N_FUZZ):
-        rd = randint(0, 31)
-        rs1 = randint(0, 31)
+        rd = randint(0, REG_NUM - 1)
+        rs1 = randint(0, REG_NUM - 1)
         imm = randint(-2048, 2047)
         instr = rv32i.encode_jalr(rd, rs1, imm)
         dut.i_instr.value = instr
@@ -661,7 +662,51 @@ async def illegal_system(dut):
         await _check(dut, i_instr=instr, o_funct3=funct3, o_is_illegal=1)
 
 
-@pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
+@cocotb.test()
+async def highest_architectural_register_is_legal(dut):
+    reg = REG_NUM - 1
+    legal = rv32i.encode_add(reg, reg, reg)
+    dut.i_instr.value = legal
+    await _check(
+        dut,
+        i_instr=legal,
+        o_rf_wen=1,
+        o_rf_dst=reg,
+        o_rf_src1=reg,
+        o_rf_src2=reg,
+        o_fu_src1=FuSrc1.REG,
+        o_fu_src2=FuSrc2.REG,
+        o_wb_sel=WbSel.FU,
+    )
+
+
+@cocotb.test(skip=(REG_NUM > 16))
+async def registers_above_x15_are_illegal(dut):
+    illegal = (
+        (rv32i.encode_add(16, 1, 2), 0b000),
+        (rv32i.encode_add(1, 16, 2), 0b000),
+        (rv32i.encode_add(1, 2, 16), 0b000),
+        (rv32i.encode_sw(1, 16, 0), 0b010),
+    )
+    for instr, funct3 in illegal:
+        dut.i_instr.value = instr
+        await _check(
+            dut,
+            i_instr=instr,
+            o_funct3=funct3,
+            o_is_illegal=1,
+        )
+
+
+@pytest.mark.parametrize(
+    "p",
+    [
+        {"WIDTH": 32, "REG_NUM": 16},
+        {"WIDTH": 32, "REG_NUM": 32},
+        {"WIDTH": 64, "REG_NUM": 16},
+        {"WIDTH": 64, "REG_NUM": 32},
+    ],
+)
 def test_ecore_decoder(p):
     run(
         "ecore",

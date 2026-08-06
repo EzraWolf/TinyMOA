@@ -3,10 +3,11 @@
 pub package ecore_pkg_cfg {
     const XLEN: u32 = 64; // 32 or 64 ONLY!!
 
-    const USE_LINUX : bbool = true;
+    const USE_LINUX : bbool = false;
 
-    const USE_BASE_I: bbool = true  ||  USE_LINUX;
-    const USE_BASE_E: bbool = false && !USE_BASE_I;
+    // either base I or E ONLY!!
+    const USE_BASE_I: bbool = false ||  USE_LINUX;
+    const USE_BASE_E: bbool = true  && !USE_BASE_I;
 
     // IMAFDC_Zbb_Zcb_Zicsr_Zicond_Zifencei_Zfbfmin
     const USE_EXT_Zfbfmin : bbool = true      || USE_LINUX;

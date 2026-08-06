@@ -17,13 +17,13 @@ PROGRAM = [
     rv32i.encode_addi(6, 0, 0),  # addi t1, zero, 0
     rv32i.encode_addi(7, 0, 1),  # addi t2, zero, 1
     rv32i.encode_beq(5, 0, 24),  # beq  t0, zero, done
-    rv32i.encode_add(28, 6, 7),  # add  t3, t1, t2
+    rv32i.encode_add(8, 6, 7),  # add  s0, t1, t2
     rv32i.encode_addi(6, 7, 0),  # addi t1, t2, 0
-    rv32i.encode_addi(7, 28, 0),  # addi t2, t3, 0
+    rv32i.encode_addi(7, 8, 0),  # addi t2, s0, 0
     rv32i.encode_addi(5, 5, -1),  # addi t0, t0, -1
     rv32i.encode_jal(0, -20),  # jal  zero, loop
-    rv32i.encode_addi(29, 0, 0x100),  # addi t4, zero, 0x100
-    rv32i.encode_sw(29, 6, 0),  # sw   t1, 0(t4)
+    rv32i.encode_addi(9, 0, 0x100),  # addi s1, zero, 0x100
+    rv32i.encode_sw(9, 6, 0),  # sw   t1, 0(s1)
     rv32i.encode_jal(0, 0),  # halt: jal zero, halt
 ]
 
@@ -87,10 +87,10 @@ async def fibonacci(dut):
 @pytest.mark.parametrize(
     "p",
     [
-        {"WIDTH": 32, "DEPTH": 16},
-        {"WIDTH": 64, "DEPTH": 16},
         {"WIDTH": 32, "DEPTH": 32},
+        {"WIDTH": 32, "DEPTH": 16},
         {"WIDTH": 64, "DEPTH": 32},
+        {"WIDTH": 64, "DEPTH": 16},
     ],
 )
 def test_ecore_top_fibonacci(p):

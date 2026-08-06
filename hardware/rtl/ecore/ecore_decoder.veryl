@@ -2,7 +2,8 @@ import ecore_pkg_cfg::*;
 import ecore_pkg_alu::*;
 
 pub module ecore_decoder #(
-    param WIDTH: u32 = 32,
+    param WIDTH  : u32 = XLEN,
+    param REG_NUM: u32 = ARCH_REGFILE_NUM,
 ) (
     i_instr     : input  logic<32>,
 
@@ -252,6 +253,15 @@ pub module ecore_decoder #(
                 }
             }
             default: o_is_illegal = 1'b1;
+        }
+
+        // illegal operation logic. tell nobody.
+
+        let uses_upper_rs1: logic = rs1[4] &&  o_fu_src1 == FuSrc1::REG;
+        let uses_upper_rs2: logic = rs2[4] && (o_fu_src2 == FuSrc2::REG || o_is_store);
+        let uses_upper_rd : logic = rd [4] &&  o_wb_sel  != WbSel::NONE;
+        if REG_NUM == 16 && (uses_upper_rs1 || uses_upper_rs2 || uses_upper_rd) {
+            o_is_illegal = 1'b1;
         }
 
         if o_is_illegal {

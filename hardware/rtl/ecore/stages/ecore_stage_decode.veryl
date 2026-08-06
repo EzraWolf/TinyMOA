@@ -75,7 +75,7 @@ pub module ecore_stage_decode #(
     let ext_imm: logic<WIDTH> = {dec_imm[msb] repeat WIDTH - 32, dec_imm};
     let output_ready: logic = !o_valid || i_ready;
 
-    inst u_decoder: ecore_decoder #(WIDTH) (
+    inst u_decoder: ecore_decoder #(WIDTH, REG_NUM: DEPTH) (
         i_instr,
         o_rf_wen    : dec_rf_wen,
         o_rf_dst    : dec_rf_dst,
