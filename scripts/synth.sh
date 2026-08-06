@@ -8,11 +8,12 @@ flags=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -nb|--no-bram) flags="$flags -nobram" ;;
+        -nl|--nolutram) flags="$flags -nolutram" ;;
         -nd|--no-dsp)  flags="$flags -nodsp" ;;
         -f|--flatten)  flags="$flags -flatten" ;;
         -r|--retime)   mapper="-retime" ;;
         *)
-            echo "usage: $0 [-nb|--no-bram] [-nd|--no-dsp] [-f|--flatten] [-r|--retime]" >&2
+            echo "usage: $0 [-nb|--no-bram] [-nl|--nolutram] [-nd|--no-dsp] [-f|--flatten] [-r|--retime]" >&2
             exit 2
             ;;
     esac
@@ -42,18 +43,28 @@ fi
 
 awk '
     function comma(n, out) {
-        out = n
+        out = n + 0
         while (out ~ /^[0-9]+[0-9]{3}$/)
             sub(/[0-9]{3}$/, ",&", out)
         return out
     }
-    $2 ~ /^LUT[1-6](_2)?$/ { lut += $1 }
-    $2 ~ /^FD/             { ff += $1 }
-    $2 ~ /^RAMB/           { bram += $1 }
-    $2 ~ /^DSP/            { dsp += $1 }
+    $2 ~ /^LUT[1-6](_2)?$/       { lut += $1 }
+    $2 ~ /^FD/                   { ff += $1 }
+    $2 ~ /^RAM/ && $2 !~ /^RAMB/ { lutram += $1 }
+    $2 == "RAM32M"               { ram32m += $1 }
+    $2 ~ /^RAMB/                 { bram += $1 }
+    $2 ~ /^DSP/                  { dsp += $1 }
     END {
-        print "synthesis results (yosys XC7)"
-        printf "- %s LUTs\n", comma(lut)
+        print "yosys XC7 results"
+        if (lutram == ram32m) {
+            ram_luts = 4 * ram32m
+            if (ram_luts)
+                printf "- %s LUTs (%s logic, %s LUTRAM as %s RAM32M)\n", comma(lut + ram_luts), comma(lut), comma(ram_luts), comma(ram32m)
+            else
+                printf "- %s LUTs (all logic)\n", comma(lut)
+        } else {
+            printf "- %s logic LUTs\n", comma(lut)
+        }
         printf "- %s FFs\n", comma(ff)
         if (bram)
             printf "- %s BRAMs\n", comma(bram)
