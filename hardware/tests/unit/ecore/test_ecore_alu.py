@@ -375,10 +375,10 @@ async def sraw_fills_sign(dut):
 @pytest.mark.parametrize(
     "p",
     [
-        {"WIDTH": 8},
-        {"WIDTH": 32},
-        {"WIDTH": 64},
-        {"WIDTH": 128},
+        pytest.param({"WIDTH": 8}, id="width8"),
+        pytest.param({"WIDTH": 32}, id="width32"),
+        pytest.param({"WIDTH": 64}, id="width64"),
+        pytest.param({"WIDTH": 128}, id="width128"),
     ],
 )
 def test_ecore_alu(p):

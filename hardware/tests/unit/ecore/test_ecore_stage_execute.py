@@ -518,10 +518,10 @@ async def flush_drops_output(dut):
 @pytest.mark.parametrize(
     "p",
     [
-        {"WIDTH": 32, "DEPTH": 16},
-        {"WIDTH": 32, "DEPTH": 32},
-        {"WIDTH": 64, "DEPTH": 16},
-        {"WIDTH": 64, "DEPTH": 32},
+        pytest.param({"WIDTH": 32, "DEPTH": 32}, id="rv32i"),
+        pytest.param({"WIDTH": 32, "DEPTH": 16}, id="rv32e"),
+        pytest.param({"WIDTH": 64, "DEPTH": 32}, id="rv64i"),
+        pytest.param({"WIDTH": 64, "DEPTH": 16}, id="rv64e"),
     ],
 )
 def test_ecore_stage_execute(p):

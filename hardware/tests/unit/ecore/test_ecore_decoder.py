@@ -701,10 +701,10 @@ async def registers_above_x15_are_illegal(dut):
 @pytest.mark.parametrize(
     "p",
     [
-        {"WIDTH": 32, "REG_NUM": 16},
-        {"WIDTH": 32, "REG_NUM": 32},
-        {"WIDTH": 64, "REG_NUM": 16},
-        {"WIDTH": 64, "REG_NUM": 32},
+        pytest.param({"WIDTH": 32, "REG_NUM": 32}, id="rv32i"),
+        pytest.param({"WIDTH": 32, "REG_NUM": 16}, id="rv32e"),
+        pytest.param({"WIDTH": 64, "REG_NUM": 32}, id="rv64i"),
+        pytest.param({"WIDTH": 64, "REG_NUM": 16}, id="rv64e"),
     ],
 )
 def test_ecore_decoder(p):

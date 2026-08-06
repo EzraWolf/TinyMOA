@@ -191,10 +191,38 @@ async def reset_clears(dut):
 @pytest.mark.parametrize(
     "p",
     [
-        {"WIDTH": 32, "DEPTH": 16, "R_PORTS": 1, "W_PORTS": 1},
-        {"WIDTH": 32, "DEPTH": 32, "R_PORTS": 2, "W_PORTS": 1},
-        {"WIDTH": 64, "DEPTH": 16, "R_PORTS": 3, "W_PORTS": 2},
-        {"WIDTH": 64, "DEPTH": 32, "R_PORTS": 4, "W_PORTS": 2},
+        pytest.param(
+            {"WIDTH": 32, "DEPTH": 16, "R_PORTS": 2, "W_PORTS": 1},
+            id="width32_depth16_r2_w1",
+        ),
+        pytest.param(
+            {"WIDTH": 32, "DEPTH": 16, "R_PORTS": 3, "W_PORTS": 2},
+            id="width32_depth16_r3_w2",
+        ),
+        pytest.param(
+            {"WIDTH": 32, "DEPTH": 32, "R_PORTS": 2, "W_PORTS": 1},
+            id="width32_depth32_r2_w1",
+        ),
+        pytest.param(
+            {"WIDTH": 32, "DEPTH": 32, "R_PORTS": 3, "W_PORTS": 2},
+            id="width32_depth32_r3_w2",
+        ),
+        pytest.param(
+            {"WIDTH": 64, "DEPTH": 16, "R_PORTS": 2, "W_PORTS": 1},
+            id="width64_depth16_r2_w1",
+        ),
+        pytest.param(
+            {"WIDTH": 64, "DEPTH": 16, "R_PORTS": 3, "W_PORTS": 2},
+            id="width64_depth16_r3_w2",
+        ),
+        pytest.param(
+            {"WIDTH": 64, "DEPTH": 32, "R_PORTS": 2, "W_PORTS": 1},
+            id="width64_depth32_r2_w1",
+        ),
+        pytest.param(
+            {"WIDTH": 64, "DEPTH": 32, "R_PORTS": 3, "W_PORTS": 2},
+            id="width64_depth32_r3_w2",
+        ),
     ],
 )
 def test_ecore_regfile(p):

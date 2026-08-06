@@ -377,6 +377,12 @@ async def invalid_op_reports_error(dut):
         await _check(dut, i_op=op, i_is_store=1, o_error=1)
 
 
-@pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
+@pytest.mark.parametrize(
+    "p",
+    [
+        pytest.param({"WIDTH": 32}, id="width32"),
+        pytest.param({"WIDTH": 64}, id="width64"),
+    ],
+)
 def test_ecore_lsu(p):
     run("ecore", "lsu", ["~ecore/ecore_lsu.sv"], params=p)

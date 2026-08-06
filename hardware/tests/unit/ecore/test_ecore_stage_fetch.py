@@ -202,6 +202,12 @@ async def redirect_flush(dut):
     )
 
 
-@pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
+@pytest.mark.parametrize(
+    "p",
+    [
+        pytest.param({"WIDTH": 32}, id="width32"),
+        pytest.param({"WIDTH": 64}, id="width64"),
+    ],
+)
 def test_ecore_stage_fetch(p):
     run("ecore", "stage_fetch", ["~ecore/stages/ecore_stage_fetch.sv"], params=p)

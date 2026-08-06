@@ -127,9 +127,10 @@ async def read_to_empty(dut):
 @pytest.mark.parametrize(
     "p",
     [
-        {"WIDTH": 32, "DEPTH": 32},
-        {"WIDTH": 64, "DEPTH": 32},
-        {"WIDTH": 32, "DEPTH": 128},
+        pytest.param({"WIDTH": 32, "DEPTH": 32}, id="width32_depth32"),
+        pytest.param({"WIDTH": 32, "DEPTH": 128}, id="width32_depth128"),
+        pytest.param({"WIDTH": 64, "DEPTH": 32}, id="width64_depth32"),
+        pytest.param({"WIDTH": 64, "DEPTH": 128}, id="width64_depth128"),
     ],
 )
 def test_mem_fifo(p):

@@ -227,6 +227,12 @@ async def invalid_input_not_taken(dut):
     await _check(dut, i_pc=4, i_imm=8, o_pc=4)
 
 
-@pytest.mark.parametrize("p", [{"WIDTH": 32}, {"WIDTH": 64}])
+@pytest.mark.parametrize(
+    "p",
+    [
+        pytest.param({"WIDTH": 32}, id="width32"),
+        pytest.param({"WIDTH": 64}, id="width64"),
+    ],
+)
 def test_ecore_bru(p):
     run("ecore", "bru", ["~ecore/ecore_bru.sv"], params=p)
