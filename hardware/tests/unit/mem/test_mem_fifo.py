@@ -54,10 +54,11 @@ async def proper_io_width(dut):
 async def write_deasserts_empty(dut):
     await setup(dut)
 
+    data = randint(0, XLEN_MASK)
     dut.i_wen.value = 1
-    dut.i_data.value = 0xDEAD
+    dut.i_data.value = data
     await FallingEdge(dut.clk)
-    await _check(dut, i_wen=1, i_data=0xDEAD, o_empty=0)
+    await _check(dut, i_wen=1, i_data=data, o_full=DEPTH == 1, o_empty=0)
 
 
 @cocotb.test()
@@ -86,11 +87,14 @@ async def write_on_full(dut):
         dut.i_data.value = randint(0, XLEN_MASK)
         await FallingEdge(dut.clk)
 
+    dut.i_data.value = first ^ XLEN_MASK
+    await FallingEdge(dut.clk)
+
     dut.i_wen.value = 0
     dut.i_data.value = 0
     dut.i_ren.value = 1
     await FallingEdge(dut.clk)
-    await _check(dut, i_ren=1, o_data=first, o_empty=0)
+    await _check(dut, i_ren=1, o_data=first, o_empty=DEPTH == 1)
 
 
 @cocotb.test()
@@ -127,6 +131,8 @@ async def read_to_empty(dut):
 @pytest.mark.parametrize(
     "p",
     [
+        pytest.param({"WIDTH": 1, "DEPTH": 1}, id="width1_depth1"),
+        pytest.param({"WIDTH": 1, "DEPTH": 128}, id="width1_depth128"),
         pytest.param({"WIDTH": 32, "DEPTH": 32}, id="width32_depth32"),
         pytest.param({"WIDTH": 32, "DEPTH": 128}, id="width32_depth128"),
         pytest.param({"WIDTH": 64, "DEPTH": 32}, id="width64_depth32"),

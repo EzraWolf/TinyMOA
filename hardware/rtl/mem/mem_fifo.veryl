@@ -14,10 +14,14 @@ pub module mem_fifo #(
     o_full : output logic,
     o_empty: output logic,
 ) {
+    const PTR_WIDTH: u32 = if DEPTH >: 1 ? $clog2(DEPTH) : 1;
+    type t_ptr = logic<PTR_WIDTH>;
+    const PTR_LAST: t_ptr = (DEPTH - 1) as t_ptr;
+
     var buffer: logic<WIDTH> [DEPTH];
 
-    var w_ptr: logic<$clog2(DEPTH)>;
-    var r_ptr: logic<$clog2(DEPTH)>;
+    var w_ptr: t_ptr;
+    var r_ptr: t_ptr;
 
     var is_read: logic;
 
@@ -31,7 +35,7 @@ pub module mem_fifo #(
         } else {
             if i_wen && !o_full {
                 buffer[w_ptr] = i_data;
-                w_ptr += '1;
+                w_ptr = if w_ptr == PTR_LAST ? '0 : w_ptr + 1'b1;
             }
         }
     }
@@ -44,7 +48,7 @@ pub module mem_fifo #(
         } else {
             if i_ren && !o_empty {
                 o_data = buffer[r_ptr];
-                r_ptr += '1;
+                r_ptr  = if r_ptr == PTR_LAST ? '0 : r_ptr + 1'b1;
             }
         }
     }
