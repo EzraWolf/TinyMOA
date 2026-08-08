@@ -21,12 +21,12 @@ pub module ecore_bru #(
         o_taken = 1'b0;
         if i_valid {
             case i_op {
-                3'b000: o_taken =  eq;  // BEQ
-                3'b001: o_taken = !eq;  // BNE
-                3'b100: o_taken =  lt;  // BLT
-                3'b101: o_taken = !lt;  // BGE
-                3'b110: o_taken =  ltu; // BLTU
-                3'b111: o_taken = !ltu; // BGEU
+                3'b000 : o_taken =  eq;  // BEQ
+                3'b001 : o_taken = !eq;  // BNE
+                3'b100 : o_taken =  lt;  // BLT
+                3'b101 : o_taken = !lt;  // BGE
+                3'b110 : o_taken =  ltu; // BLTU
+                3'b111 : o_taken = !ltu; // BGEU
                 default: o_taken = 1'b0;
             }
         }

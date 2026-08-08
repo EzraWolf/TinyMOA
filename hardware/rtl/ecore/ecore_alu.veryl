@@ -32,7 +32,7 @@ pub module ecore_alu #(
     let shifted  : logic<WIDTH + 1> = $signed(shift_ext) >>> real_shamt;
 
     for i in 0..WIDTH :gen_shift_bits {
-        assign shift_in[i] = if (do_sll) ? real_a[WIDTH - 1 - i] : real_a[i];
+        assign shift_in [i] = if (do_sll) ? real_a [WIDTH - 1 - i] : real_a [i];
         assign shift_out[i] = if (do_sll) ? shifted[WIDTH - 1 - i] : shifted[i];
     }
 
@@ -50,19 +50,19 @@ pub module ecore_alu #(
                     3'b000: real_op = AluOp::ADD;
                     3'b001: real_op = AluOp::SUB;
                     3'b010: {
-                        real_op    = AluOp::SLL;
-                        real_a     = {1'b0 repeat WIDTH - 32, i_a[31:0]};
-                        real_shamt = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
+                        real_op     = AluOp::SLL;
+                        real_a      = {1'b0 repeat WIDTH - 32, i_a[31:0]};
+                        real_shamt  = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
                     }
                     3'b011: {
-                        real_op    = AluOp::SRL;
-                        real_a     = {1'b0 repeat WIDTH - 32, i_a[31:0]};
-                        real_shamt = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
+                        real_op     = AluOp::SRL;
+                        real_a      = {1'b0 repeat WIDTH - 32, i_a[31:0]};
+                        real_shamt  = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
                     }
                     3'b100: {
-                        real_op    = AluOp::SRA;
-                        real_a     = {i_a[31] repeat WIDTH - 32, i_a[31:0]};
-                        real_shamt = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
+                        real_op     = AluOp::SRA;
+                        real_a      = {i_a[31] repeat WIDTH - 32, i_a[31:0]};
+                        real_shamt  = {1'b0 repeat $clog2(WIDTH) - 5, shamt[4:0]};
                     }
                     default: {}
                 }

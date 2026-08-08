@@ -47,12 +47,12 @@ pub module ecore_decoder #(
     let op    : logic<5>  = i_instr[6:2];
     let quad  : logic<2>  = i_instr[1:0];
 
-    assign o_rf_src1 = if (o_fu_src1 == FuSrc1::REG) ? rs1 : 5'b0;
-    assign o_rf_src2 = if (o_fu_src2 == FuSrc2::REG || o_is_store) ? rs2 : 5'b0;
-    assign o_rf_dst  = if (o_wb_sel  != WbSel::NONE ) ? rd  : 5'b0;
-    assign o_rf_wen  = o_wb_sel      != WbSel::NONE;
-    assign o_mem_ren = o_is_load     == 1'b1 || o_wb_sel == WbSel::MEM;
-    assign o_mem_wen = o_is_store    == 1'b1;
+    assign o_rf_src1 = if (o_fu_src1  == FuSrc1::REG) ? rs1 : 5'b0;
+    assign o_rf_src2 = if (o_fu_src2  == FuSrc2::REG || o_is_store) ? rs2 : 5'b0;
+    assign o_rf_dst  = if (o_wb_sel   != WbSel::NONE) ? rd  : 5'b0;
+    assign o_rf_wen  =     o_wb_sel   != WbSel::NONE;
+    assign o_mem_ren =     o_is_load  == 1'b1 || o_wb_sel == WbSel::MEM;
+    assign o_mem_wen =     o_is_store == 1'b1;
 
     always_comb {
         o_fu_op      = AluOp::ADD;
@@ -142,9 +142,7 @@ pub module ecore_decoder #(
                                 }
                                 default: o_is_illegal = 1'b1;
                             }
-                        } else {
-                            o_is_illegal = 1'b1;
-                        }
+                        } else { o_is_illegal = 1'b1; }
                     }
                     5'b01110: { // RV64 R-Type ALU word ops
                         if WIDTH >= 64 {
@@ -156,9 +154,7 @@ pub module ecore_decoder #(
                                 {3'b101, 7'b0100000}: o_fu_op = AluOp::SRAW;
                                 default: o_is_illegal = 1'b1;
                             }
-                        } else {
-                            o_is_illegal = 1'b1;
-                        }
+                        } else { o_is_illegal = 1'b1; }
                     }
                     5'b00000: { // I-Type load ops
                         o_fu_src2 = FuSrc2::IMM;
@@ -169,11 +165,8 @@ pub module ecore_decoder #(
                             3'b010        : {} // LW
                             3'b001, 3'b101: {} // LH, LHU
                             3'b000, 3'b100: {} // LB, LBU
-                            3'b011, 3'b110: { // LD, LWU
-                                if WIDTH >= 64 {
-                                } else {
-                                    o_is_illegal = 1'b1;
-                                }
+                            3'b011, 3'b110: {  // LD, LWU
+                                o_is_illegal = if WIDTH <= 32 ? 1'b1 : 1'b0;
                             }
                             default: o_is_illegal = 1'b1;
                         }
@@ -187,7 +180,7 @@ pub module ecore_decoder #(
                             3'b010: {} // SW
                             3'b001: {} // SH
                             3'b000: {} // SB
-                            3'b011: { // SD
+                            3'b011: {  // SD
                                 if WIDTH >= 64 {
                                 } else {
                                     o_is_illegal = 1'b1;
@@ -230,9 +223,9 @@ pub module ecore_decoder #(
                         o_imm     = imm_u;
                     }
                     5'b00011: { // FENCE
-                        o_fu_src1 = FuSrc1::NONE;
-                        o_fu_src2 = FuSrc2::NONE;
-                        o_wb_sel  = WbSel::NONE;
+                        o_fu_src1  = FuSrc1::NONE;
+                        o_fu_src2  = FuSrc2::NONE;
+                        o_wb_sel   = WbSel::NONE;
                         if funct3 == 3'b000 {
                             o_is_fence = 1'b1;
                         } else {
@@ -244,8 +237,8 @@ pub module ecore_decoder #(
                         o_fu_src2 = FuSrc2::NONE;
                         o_wb_sel  = WbSel::NONE;
                         case i_instr {
-                            32'h00000073: o_is_ecall  = 1'b1;
-                            32'h00100073: o_is_ebreak = 1'b1;
+                            32'h00000073: o_is_ecall   = 1'b1;
+                            32'h00100073: o_is_ebreak  = 1'b1;
                             default     : o_is_illegal = 1'b1;
                         }
                     }
@@ -265,15 +258,15 @@ pub module ecore_decoder #(
         }
 
         if o_is_illegal {
-            o_fu_op      = AluOp::ADD;
-            o_fu_src1    = FuSrc1::NONE;
-            o_fu_src2    = FuSrc2::NONE;
-            o_imm        = 32'b0;
-            o_wb_sel     = WbSel::NONE;
-            o_is_load    = 1'b0;
-            o_is_store   = 1'b0;
-            o_is_jump    = 1'b0;
-            o_is_branch  = 1'b0;
+            o_fu_op     = AluOp::ADD;
+            o_fu_src1   = FuSrc1::NONE;
+            o_fu_src2   = FuSrc2::NONE;
+            o_imm       = 32'b0;
+            o_wb_sel    = WbSel::NONE;
+            o_is_load   = 1'b0;
+            o_is_store  = 1'b0;
+            o_is_jump   = 1'b0;
+            o_is_branch = 1'b0;
         }
     }
 }

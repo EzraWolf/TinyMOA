@@ -74,23 +74,23 @@ pub module ecore_top #(
     var redirect_valid    : logic;
     var redirect_pc       : logic<WIDTH>;
 
-    var memory_valid     : logic;
-    var memory_ready     : logic;
-    var memory_pc        : logic<WIDTH>;
-    var memory_fu_data   : logic<WIDTH>;
-    var memory_load_data : logic<WIDTH>;
-    var memory_is_fence  : logic;
-    var memory_is_ecall  : logic;
-    var memory_is_ebreak : logic;
-    var memory_is_illegal: logic;
-    var memory_error     : logic;
-    var memory_wb_sel    : WbSel;
-    var memory_rf_wen    : logic;
-    var memory_rf_dst    : logic<$clog2(DEPTH)>;
+    var memory_valid      : logic;
+    var memory_ready      : logic;
+    var memory_pc         : logic<WIDTH>;
+    var memory_fu_data    : logic<WIDTH>;
+    var memory_load_data  : logic<WIDTH>;
+    var memory_is_fence   : logic;
+    var memory_is_ecall   : logic;
+    var memory_is_ebreak  : logic;
+    var memory_is_illegal : logic;
+    var memory_error      : logic;
+    var memory_wb_sel     : WbSel;
+    var memory_rf_wen     : logic;
+    var memory_rf_dst     : logic<$clog2(DEPTH)>;
 
-    var writeback_rf_wen : logic;
-    var writeback_rf_dst : logic<$clog2(DEPTH)>;
-    var writeback_rf_data: logic<WIDTH>;
+    var writeback_rf_wen  : logic;
+    var writeback_rf_dst  : logic<$clog2(DEPTH)>;
+    var writeback_rf_data : logic<WIDTH>;
 
     inst u_fetch: ecore_stage_fetch #(WIDTH) (
         clk, rst,

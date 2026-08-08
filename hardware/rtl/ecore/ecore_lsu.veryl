@@ -17,10 +17,10 @@ pub module ecore_lsu #(
     var align_mask : logic<3>;
 
     let byte_offset: logic<$clog2(WIDTH / 8)> = i_addr[$clog2(WIDTH / 8) - 1:0];
-    let bit_offset : logic<$clog2(WIDTH)> = {byte_offset, 3'b0};
-    let shift_rdata: logic<WIDTH> = i_rdata >> bit_offset;
-    let shift_wdata: logic<WIDTH> = i_store_data << bit_offset;
-    let is_misalign: logic = (i_addr[2:0] & align_mask) != 0;
+    let bit_offset : logic<$clog2(WIDTH)>     = {byte_offset, 3'b0};
+    let shift_rdata: logic<WIDTH>             = i_rdata      >> bit_offset;
+    let shift_wdata: logic<WIDTH>             = i_store_data << bit_offset;
+    let is_misalign: logic                    = (i_addr[2:0]  & align_mask) != 0;
 
     always_comb {
         case i_op[1:0] {
@@ -76,7 +76,7 @@ pub module ecore_lsu #(
             case i_op {
                 3'b010: { // LW
                     o_load_data = {shift_rdata[31] repeat WIDTH - 32, shift_rdata[31:0]};
-                    o_error = is_misalign;
+                    o_error     = is_misalign;
                 }
                 3'b000: { // LB
                     o_load_data = {shift_rdata[7] repeat WIDTH - 8, shift_rdata[7:0]};
@@ -86,22 +86,22 @@ pub module ecore_lsu #(
                 }
                 3'b001: { // LH
                     o_load_data = {shift_rdata[15] repeat WIDTH - 16, shift_rdata[15:0]};
-                    o_error = is_misalign;
+                    o_error     = is_misalign;
                 }
                 3'b101: { // LHU
                     o_load_data = {1'b0 repeat WIDTH - 16, shift_rdata[15:0]};
-                    o_error = is_misalign;
+                    o_error     = is_misalign;
                 }
                 3'b011: { // LD
                     if WIDTH >= 64 {
                         o_load_data = i_rdata;
-                        o_error = is_misalign;
+                        o_error     = is_misalign;
                     } else { o_error = 1'b1; }
                 }
                 3'b110: { // LWU
                     if WIDTH >= 64 {
                         o_load_data = {1'b0 repeat WIDTH - 32, shift_rdata[31:0]};
-                        o_error = is_misalign;
+                        o_error     = is_misalign;
                     } else { o_error = 1'b1; }
                 }
                 default: o_error = 1'b1;

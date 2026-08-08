@@ -14,11 +14,11 @@ pub module ecore_regfile #(
     i_raddr: input  logic<$clog2(DEPTH)> [R_PORTS],
     o_rdata: output logic       <WIDTH>  [R_PORTS],
 ) {
-    // no reset significantly reduces size
-    // x0 writes w/ LUTRAM dont change, saving size
+    // writing to x0 changes nothing, spare the LUTRAM
     type t_reg = bit<WIDTH>;
     var regs: t_reg [DEPTH];
 
+    // no reset significantly reduces size
     always_ff (clk) {
         for i in 0..W_PORTS {
             if i_wen[i] && i_waddr[i] != 0 {

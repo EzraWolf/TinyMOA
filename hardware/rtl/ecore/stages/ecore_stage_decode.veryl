@@ -73,7 +73,7 @@ pub module ecore_stage_decode #(
     var hazard        : logic;
 
     let ext_imm: logic<WIDTH> = {dec_imm[msb] repeat WIDTH - 32, dec_imm};
-    let output_ready: logic = !o_valid || i_ready;
+    let output_ready: logic   = !o_valid || i_ready;
 
     inst u_decoder: ecore_decoder #(WIDTH, REG_NUM: DEPTH) (
         i_instr,
@@ -121,6 +121,7 @@ pub module ecore_stage_decode #(
     for i in 0..RF_R_PORTS :connect_read_ports {
         assign rf_raddr[i] = dec_rf_src[i][$clog2(DEPTH) - 1:0];
     }
+
     for i in 0..RF_W_PORTS :connect_write_ports {
         assign rf_wen  [i] = i_wb_wen;
         assign rf_waddr[i] = i_wb_dst;

@@ -119,9 +119,9 @@ pub module ecore_stage_execute #(
             o_redirect_valid  = i_valid && (i_is_jump || branch_taken);
             o_redirect_pc     = '0;
             if i_valid && i_is_jump {
-                o_redirect_pc = {fu_data[msb:1], 1'b0};
+                o_redirect_pc  = {fu_data[msb:1], 1'b0};
             } else if i_valid && branch_taken {
-                o_redirect_pc =  branch_pc;
+                o_redirect_pc  = branch_pc;
             }
         }
     }

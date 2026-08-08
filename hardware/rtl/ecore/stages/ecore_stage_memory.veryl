@@ -56,7 +56,7 @@ pub module ecore_stage_memory #(
     var lsu_load_data: logic<WIDTH>;
     var lsu_error    : logic;
 
-    let output_ready : logic = !o_valid || i_ready;
+    let output_ready : logic = !o_valid  || i_ready;
     let mem_access   : logic = i_mem_ren || i_mem_wen;
 
     inst u_lsu: ecore_lsu #(WIDTH) (
@@ -72,8 +72,8 @@ pub module ecore_stage_memory #(
         o_error     : lsu_error,
     );
 
-    assign o_dmem_valid = i_valid && mem_access && !lsu_error && output_ready && !i_flush;
-    assign o_ready = i_flush || (output_ready && (!i_valid || !mem_access || lsu_error || i_dmem_ready));
+    assign o_dmem_valid = i_valid &&  mem_access   &&  !lsu_error &&  output_ready && !i_flush;
+    assign o_ready      = i_flush || (output_ready && (!i_valid   || !mem_access   ||  lsu_error || i_dmem_ready));
 
     always_comb {
         o_dmem_ren   = 1'b0;
