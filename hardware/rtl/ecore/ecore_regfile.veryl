@@ -28,6 +28,7 @@ pub module ecore_regfile #(
     }
 
     for i in 0..R_PORTS :gen_read_ports {
-        assign o_rdata[i] = regs[i_raddr[i]];
+        // x0 hardwired to 0 (write-suppress alone is not enough w/ no reset)
+        assign o_rdata[i] = if i_raddr[i] == 0 ? '0 : regs[i_raddr[i]];
     }
 }
