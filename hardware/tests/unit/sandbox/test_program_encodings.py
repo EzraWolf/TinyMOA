@@ -1,8 +1,9 @@
-"""Ensure hardware/tests/common/encode_rv32i stays byte-identical to sandbox encode (truth)."""
+"""Sandbox encode is the single packing source; tests.common.encode_rv32i re-exports it."""
 
 from __future__ import annotations
 
 import importlib.util
+import inspect
 from pathlib import Path
 
 from tinymoa_cpu import encode as sandbox_enc
@@ -18,19 +19,24 @@ def _load_test_encode():
     return mod
 
 
-def test_sandbox_encode_matches_test_helper_api():
+def test_encode_rv32i_reexports_sandbox_encode():
     test_enc = _load_test_encode()
-    cases = [
-        ("encode_addi", (5, 0, 10)),
-        ("encode_add", (8, 6, 7)),
-        ("encode_beq", (5, 0, 24)),
-        ("encode_jal", (0, -20)),
-        ("encode_sw", (9, 6, 0)),
-        ("encode_lui", (1, 0x12345)),
-        ("encode_ecall", ()),
-    ]
-    for name, args in cases:
-        assert getattr(sandbox_enc, name)(*args) == getattr(test_enc, name)(*args), name
+    sandbox_fns = {
+        name: fn
+        for name, fn in inspect.getmembers(sandbox_enc, inspect.isfunction)
+        if name.startswith("encode_")
+    }
+    assert sandbox_fns, "sandbox encode surface empty"
+    for name, fn in sandbox_fns.items():
+        assert getattr(test_enc, name) is fn, name
+
+
+def test_rv64_shift_encode_keeps_six_bit_shamt():
+    assert sandbox_enc.encode_slli(2, 1, 40, width=64) == sandbox_enc.encode_i_type(40, 1, 0x1, 2, 0x13)
+    assert sandbox_enc.encode_srli(2, 1, 40, width=64) == sandbox_enc.encode_i_type(40, 1, 0x5, 2, 0x13)
+    assert sandbox_enc.encode_srai(2, 1, 40, width=64) == sandbox_enc.encode_i_type(0x400 | 40, 1, 0x5, 2, 0x13)
+    # RV32 truncates; shamt 40 must not survive as 40.
+    assert sandbox_enc.encode_slli(2, 1, 40, width=32) == sandbox_enc.encode_i_type(8, 1, 0x1, 2, 0x13)
 
 
 def test_fibonacci_built_from_sandbox_encode():

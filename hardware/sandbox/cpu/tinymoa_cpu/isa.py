@@ -285,7 +285,8 @@ def decode(instr: int, width: int = 32, reg_num: int = 32) -> Decoded:
         mem_ren=mem_ren,
         mem_wen=mem_wen,
         wb_sel=wb_sel,
-        funct3=out_funct3 if not is_illegal else funct3,
+        # Match RTL: o_funct3 is whatever was assigned before illegal clear (0 if never entered a legal op path).
+        funct3=out_funct3,
         is_load=is_load,
         is_store=is_store,
         is_jump=is_jump,

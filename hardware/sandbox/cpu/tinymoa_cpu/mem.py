@@ -11,6 +11,10 @@ from tinymoa_cpu.lsu import apply_store
 # Missing imem returns jal x0,0 (self-loop) — TB policy, not Core.
 FILL_INSTR = encode_jal(0, 0)
 
+# Shared Spike/sandbox DRAM window (ELF load + -m map + program data addresses).
+DRAM_BASE = 0x80000000
+DRAM_SIZE = 0x200000
+
 
 @dataclass
 class IdealMem:

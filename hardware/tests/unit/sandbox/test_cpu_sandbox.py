@@ -1,5 +1,6 @@
 """Sandbox unit + property tests."""
 
+from tinymoa_cpu import encode as enc
 from tinymoa_cpu.arch import ArchCore
 from tinymoa_cpu.lockstep import compare_retires
 from tinymoa_cpu.mem import IdealMem, imem_from_words
@@ -115,9 +116,21 @@ def test_spike_matches_arch_raw_and_branch():
         compare_spike_to_arch(words, arch.retires, width=32, depth=32)
 
 
+def test_spike_matches_arch_rv64_addiw():
+    """RV64 LUI data addrs need dual Spike DRAM map (low + sign-extended)."""
+    arch = ArchCore(width=64, depth=32, mem=IdealMem(imem=imem_from_words(RV64_W))).run()
+    compare_spike_to_arch(RV64_W, arch.retires, width=64, depth=32)
+
+
+def test_spike_matches_arch_rv32e_until_illegal():
+    """Spike traps on illegal; e-core skips — prefix + illegal decode must agree."""
+    arch = ArchCore(width=32, depth=16, mem=IdealMem(imem=imem_from_words(RV32E_HIGHREG))).run()
+    compare_spike_to_arch(RV32E_HIGHREG, arch.retires, width=32, depth=16)
+
+
 def test_spike_compare_rejects_arch_missing_write():
     """Regression: arch rd=None must not skip a Spike GPR write."""
-    words = [0x00A00293, 0x0000006F]  # addi t0,x0,10; halt
+    words = [enc.encode_addi(5, 0, 10), enc.encode_jal(0, 0)]
     fake = [RetireEvent(0, None, None), RetireEvent(4, None, None)]
     try:
         compare_spike_to_arch(words, fake, width=32, depth=32)

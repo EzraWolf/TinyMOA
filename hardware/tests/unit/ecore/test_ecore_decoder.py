@@ -308,12 +308,12 @@ async def srai(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def rv64_shift_immediates_use_six_bit_shamt(dut):
-    for funct3, upper, fu_op in (
-        (0b001, 0x000, AluOp.SLL),
-        (0b101, 0x000, AluOp.SRL),
-        (0b101, 0x400, AluOp.SRA),
+    for encode, upper, fu_op, funct3 in (
+        (rv32i.encode_slli, 0x000, AluOp.SLL, 0b001),
+        (rv32i.encode_srli, 0x000, AluOp.SRL, 0b101),
+        (rv32i.encode_srai, 0x400, AluOp.SRA, 0b101),
     ):
-        instr = rv32i.encode_i_type(upper | 40, 1, funct3, 2, 0x13)
+        instr = encode(2, 1, 40, width=64)
         dut.i_instr.value = instr
         await _check(
             dut,
@@ -333,13 +333,13 @@ async def rv64_shift_immediates_use_six_bit_shamt(dut):
 @cocotb.test(skip=(WIDTH < 64))
 async def op_imm_32(dut):
     cases = (
-        (0b000, -1, AluOp.ADDW),
-        (0b001, 31, AluOp.SLLW),
-        (0b101, 31, AluOp.SRLW),
-        (0b101, 0x400 | 31, AluOp.SRAW),
+        (rv32i.encode_addiw, -1, AluOp.ADDW, 0b000, -1),
+        (rv32i.encode_slliw, 31, AluOp.SLLW, 0b001, 31),
+        (rv32i.encode_srliw, 31, AluOp.SRLW, 0b101, 31),
+        (rv32i.encode_sraiw, 31, AluOp.SRAW, 0b101, 0x400 | 31),
     )
-    for funct3, imm, fu_op in cases:
-        instr = rv32i.encode_i_type(imm, 1, funct3, 2, 0x1B)
+    for encode, shamt_or_imm, fu_op, funct3, imm_bits in cases:
+        instr = encode(2, 1, shamt_or_imm)
         dut.i_instr.value = instr
         await _check(
             dut,
@@ -350,7 +350,7 @@ async def op_imm_32(dut):
             o_fu_op=fu_op,
             o_fu_src1=FuSrc1.REG,
             o_fu_src2=FuSrc2.IMM,
-            o_imm=imm & 0xFFFF_FFFF,
+            o_imm=imm_bits & 0xFFFF_FFFF,
             o_wb_sel=WbSel.FU,
             o_funct3=funct3,
         )
@@ -359,14 +359,14 @@ async def op_imm_32(dut):
 @cocotb.test(skip=(WIDTH < 64))
 async def op_32(dut):
     cases = (
-        (0x00, 0b000, AluOp.ADDW),
-        (0x20, 0b000, AluOp.SUBW),
-        (0x00, 0b001, AluOp.SLLW),
-        (0x00, 0b101, AluOp.SRLW),
-        (0x20, 0b101, AluOp.SRAW),
+        (rv32i.encode_addw, AluOp.ADDW, 0b000),
+        (rv32i.encode_subw, AluOp.SUBW, 0b000),
+        (rv32i.encode_sllw, AluOp.SLLW, 0b001),
+        (rv32i.encode_srlw, AluOp.SRLW, 0b101),
+        (rv32i.encode_sraw, AluOp.SRAW, 0b101),
     )
-    for funct7, funct3, fu_op in cases:
-        instr = rv32i.encode_r_type(funct7, 3, 1, funct3, 2, 0x3B)
+    for encode, fu_op, funct3 in cases:
+        instr = encode(2, 1, 3)
         dut.i_instr.value = instr
         await _check(
             dut,
@@ -410,16 +410,12 @@ async def lhu(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def ld(dut):
-    await _load(
-        dut, lambda rd, rs1, imm: rv32i.encode_i_type(imm, rs1, 0b011, rd, 0x03), 0b011
-    )
+    await _load(dut, rv32i.encode_ld, 0b011)
 
 
 @cocotb.test(skip=(WIDTH < 64))
 async def lwu(dut):
-    await _load(
-        dut, lambda rd, rs1, imm: rv32i.encode_i_type(imm, rs1, 0b110, rd, 0x03), 0b110
-    )
+    await _load(dut, rv32i.encode_lwu, 0b110)
 
 
 @cocotb.test()
@@ -439,11 +435,7 @@ async def sw(dut):
 
 @cocotb.test(skip=(WIDTH < 64))
 async def sd(dut):
-    await _store(
-        dut,
-        lambda rs1, rs2, imm: rv32i.encode_s_type(imm, rs2, rs1, 0b011, 0x23),
-        0b011,
-    )
+    await _store(dut, rv32i.encode_sd, 0b011)
 
 
 @cocotb.test()

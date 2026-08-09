@@ -1,0 +1,210 @@
+{
+  "add": {
+    "mask": "0xfe00707f",
+    "match": "0x33"
+  },
+  "addi": {
+    "mask": "0x707f",
+    "match": "0x13"
+  },
+  "addiw": {
+    "mask": "0x707f",
+    "match": "0x1b"
+  },
+  "addw": {
+    "mask": "0xfe00707f",
+    "match": "0x3b"
+  },
+  "and": {
+    "mask": "0xfe00707f",
+    "match": "0x7033"
+  },
+  "andi": {
+    "mask": "0x707f",
+    "match": "0x7013"
+  },
+  "auipc": {
+    "mask": "0x7f",
+    "match": "0x17"
+  },
+  "beq": {
+    "mask": "0x707f",
+    "match": "0x63"
+  },
+  "bge": {
+    "mask": "0x707f",
+    "match": "0x5063"
+  },
+  "bgeu": {
+    "mask": "0x707f",
+    "match": "0x7063"
+  },
+  "blt": {
+    "mask": "0x707f",
+    "match": "0x4063"
+  },
+  "bltu": {
+    "mask": "0x707f",
+    "match": "0x6063"
+  },
+  "bne": {
+    "mask": "0x707f",
+    "match": "0x1063"
+  },
+  "ebreak": {
+    "mask": "0xffffffff",
+    "match": "0x100073"
+  },
+  "ecall": {
+    "mask": "0xffffffff",
+    "match": "0x73"
+  },
+  "fence": {
+    "mask": "0x707f",
+    "match": "0xf"
+  },
+  "jal": {
+    "mask": "0x7f",
+    "match": "0x6f"
+  },
+  "jalr": {
+    "mask": "0x707f",
+    "match": "0x67"
+  },
+  "lb": {
+    "mask": "0x707f",
+    "match": "0x3"
+  },
+  "lbu": {
+    "mask": "0x707f",
+    "match": "0x4003"
+  },
+  "ld": {
+    "mask": "0x707f",
+    "match": "0x3003"
+  },
+  "lh": {
+    "mask": "0x707f",
+    "match": "0x1003"
+  },
+  "lhu": {
+    "mask": "0x707f",
+    "match": "0x5003"
+  },
+  "lui": {
+    "mask": "0x7f",
+    "match": "0x37"
+  },
+  "lw": {
+    "mask": "0x707f",
+    "match": "0x2003"
+  },
+  "lwu": {
+    "mask": "0x707f",
+    "match": "0x6003"
+  },
+  "or": {
+    "mask": "0xfe00707f",
+    "match": "0x6033"
+  },
+  "ori": {
+    "mask": "0x707f",
+    "match": "0x6013"
+  },
+  "sb": {
+    "mask": "0x707f",
+    "match": "0x23"
+  },
+  "sd": {
+    "mask": "0x707f",
+    "match": "0x3023"
+  },
+  "sh": {
+    "mask": "0x707f",
+    "match": "0x1023"
+  },
+  "sll": {
+    "mask": "0xfe00707f",
+    "match": "0x1033"
+  },
+  "slli": {
+    "mask": "0xfc00707f",
+    "match": "0x1013"
+  },
+  "slliw": {
+    "mask": "0xfe00707f",
+    "match": "0x101b"
+  },
+  "sllw": {
+    "mask": "0xfe00707f",
+    "match": "0x103b"
+  },
+  "slt": {
+    "mask": "0xfe00707f",
+    "match": "0x2033"
+  },
+  "slti": {
+    "mask": "0x707f",
+    "match": "0x2013"
+  },
+  "sltiu": {
+    "mask": "0x707f",
+    "match": "0x3013"
+  },
+  "sltu": {
+    "mask": "0xfe00707f",
+    "match": "0x3033"
+  },
+  "sra": {
+    "mask": "0xfe00707f",
+    "match": "0x40005033"
+  },
+  "srai": {
+    "mask": "0xfc00707f",
+    "match": "0x40005013"
+  },
+  "sraiw": {
+    "mask": "0xfe00707f",
+    "match": "0x4000501b"
+  },
+  "sraw": {
+    "mask": "0xfe00707f",
+    "match": "0x4000503b"
+  },
+  "srl": {
+    "mask": "0xfe00707f",
+    "match": "0x5033"
+  },
+  "srli": {
+    "mask": "0xfc00707f",
+    "match": "0x5013"
+  },
+  "srliw": {
+    "mask": "0xfe00707f",
+    "match": "0x501b"
+  },
+  "srlw": {
+    "mask": "0xfe00707f",
+    "match": "0x503b"
+  },
+  "sub": {
+    "mask": "0xfe00707f",
+    "match": "0x40000033"
+  },
+  "subw": {
+    "mask": "0xfe00707f",
+    "match": "0x4000003b"
+  },
+  "sw": {
+    "mask": "0x707f",
+    "match": "0x2023"
+  },
+  "xor": {
+    "mask": "0xfe00707f",
+    "match": "0x4033"
+  },
+  "xori": {
+    "mask": "0x707f",
+    "match": "0x4013"
+  }
+}

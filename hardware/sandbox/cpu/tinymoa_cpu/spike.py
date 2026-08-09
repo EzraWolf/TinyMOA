@@ -1,16 +1,17 @@
-"""Minimal Spike driver: bare ELF + -l/--log-commits retire compare."""
+"""Spike driver: llvm-mc + ld.lld ELF + -l/--log-commits retire compare."""
 
 from __future__ import annotations
 
 import os
 import re
 import shutil
-import struct
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from tinymoa_cpu.llvm_tools import find_ld_lld, find_llvm_mc
+from tinymoa_cpu.mem import DRAM_BASE, DRAM_SIZE
 from tinymoa_cpu.top import RetireEvent
 
 
@@ -33,91 +34,43 @@ def _find_spike() -> str:
     )
 
 
-def write_flat_elf(path: Path, words: list[int], *, base: int = 0x80000000, width: int = 32) -> None:
-    """Write a minimal Spike-loadable RISC-V ELF (ELF32 for XLEN=32, ELF64 for XLEN=64)."""
-    text = b"".join(struct.pack("<I", w & 0xFFFFFFFF) for w in words)
-    shstr = b"\x00.text\x00.shstrtab\x00"
-    if width <= 32:
-        _write_elf32(path, text, base, shstr)
-    else:
-        _write_elf64(path, text, base, shstr)
-
-
-def _write_elf32(path: Path, text: bytes, base: int, shstr: bytes) -> None:
-    ehsize, phentsize, shentsize = 52, 32, 40
-    phoff = ehsize
-    text_off = phoff + phentsize
-    text_off = (text_off + 3) & ~3
-    shnum, shstrndx = 3, 2
-    shoff = text_off + len(text)
-    shoff = (shoff + 3) & ~3
-    shstr_off = shoff + shentsize * shnum
-
-    hdr = bytearray(ehsize)
-    hdr[0:4] = b"\x7fELF"
-    hdr[4:7] = b"\x01\x01\x01"
-    struct.pack_into("<HHI", hdr, 16, 2, 243, 1)
-    struct.pack_into("<IIII", hdr, 24, base, phoff, shoff, 0)
-    struct.pack_into("<HHHHHH", hdr, 40, ehsize, phentsize, 1, shentsize, shnum, shstrndx)
-
-    phdr = bytearray(phentsize)
-    struct.pack_into("<IIIIIIII", phdr, 0, 1, text_off, base, base, len(text), len(text), 5, 4)
-
-    shdrs = bytearray(shentsize * shnum)
-    # .text @1
-    struct.pack_into("<IIIIIIIIII", shdrs, shentsize, 1, 1, 6, base, text_off, len(text), 0, 0, 4, 0)
-    # .shstrtab @2
-    struct.pack_into(
-        "<IIIIIIIIII", shdrs, shentsize * 2, 7, 3, 0, 0, shstr_off, len(shstr), 0, 0, 1, 0
-    )
-
-    blob = bytearray(shstr_off + len(shstr))
-    blob[0:ehsize] = hdr
-    blob[phoff : phoff + phentsize] = phdr
-    blob[text_off : text_off + len(text)] = text
-    blob[shoff : shoff + len(shdrs)] = shdrs
-    blob[shstr_off:] = shstr
-    path.write_bytes(blob)
-
-
-def _write_elf64(path: Path, text: bytes, base: int, shstr: bytes) -> None:
-    ehsize, phentsize, shentsize = 64, 56, 64
-    phoff = ehsize
-    text_off = phoff + phentsize
-    text_off = (text_off + 7) & ~7
-    shnum, shstrndx = 3, 2
-    shoff = text_off + len(text)
-    shoff = (shoff + 7) & ~7
-    shstr_off = shoff + shentsize * shnum
-
-    hdr = bytearray(ehsize)
-    hdr[0:4] = b"\x7fELF"
-    hdr[4:7] = b"\x02\x01\x01"
-    struct.pack_into("<HHI", hdr, 16, 2, 243, 1)
-    struct.pack_into("<QQQ", hdr, 24, base, phoff, shoff)
-    struct.pack_into("<IHHHHHH", hdr, 48, 0, ehsize, phentsize, 1, shentsize, shnum, shstrndx)
-
-    phdr = bytearray(phentsize)
-    struct.pack_into("<II", phdr, 0, 1, 5)
-    struct.pack_into("<QQQQQQ", phdr, 8, text_off, base, base, len(text), len(text), 8)
-
-    shdrs = bytearray(shentsize * shnum)
-    off = shentsize
-    struct.pack_into("<II", shdrs, off, 1, 1)
-    struct.pack_into("<QQQQ", shdrs, off + 8, 6, base, text_off, len(text))
-    struct.pack_into("<QQ", shdrs, off + 48, 8, 0)
-    off = shentsize * 2
-    struct.pack_into("<II", shdrs, off, 7, 3)
-    struct.pack_into("<QQQQ", shdrs, off + 8, 0, 0, shstr_off, len(shstr))
-    struct.pack_into("<QQ", shdrs, off + 48, 1, 0)
-
-    blob = bytearray(shstr_off + len(shstr))
-    blob[0:ehsize] = hdr
-    blob[phoff : phoff + phentsize] = phdr
-    blob[text_off : text_off + len(text)] = text
-    blob[shoff : shoff + len(shdrs)] = shdrs
-    blob[shstr_off:] = shstr
-    path.write_bytes(blob)
+def write_flat_elf(path: Path, words: list[int], *, base: int = DRAM_BASE, width: int = 32) -> None:
+    """Assemble program words into a Spike-loadable ELF via llvm-mc + ld.lld."""
+    llvm_mc = find_llvm_mc()
+    ld_lld = find_ld_lld()
+    triple = "riscv64" if width >= 64 else "riscv32"
+    emul = "elf64lriscv" if width >= 64 else "elf32lriscv"
+    asm_lines = [
+        ".section .text",
+        ".globl _start",
+        "_start:",
+        *[f"  .word 0x{w & 0xFFFFFFFF:08x}" for w in words],
+    ]
+    with tempfile.TemporaryDirectory(prefix="tinymoa_elf_") as td:
+        td_path = Path(td)
+        src = td_path / "prog.s"
+        obj = td_path / "prog.o"
+        lds = td_path / "spike.ld"
+        src.write_text("\n".join(asm_lines) + "\n")
+        lds.write_text(
+            "ENTRY(_start)\n"
+            "SECTIONS {\n"
+            f"  . = {base:#x};\n"
+            "  .text : { *(.text .text.*) }\n"
+            "}\n"
+        )
+        subprocess.run(
+            [llvm_mc, f"-triple={triple}", "-filetype=obj", "-o", str(obj), str(src)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            [ld_lld, f"-m{emul}", "-T", str(lds), "-o", str(path), str(obj)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
 
 # commit line: core   0: 3 0x80000000 (0x00a00293) x5  0x0000000a
@@ -139,17 +92,28 @@ def isa_string(width: int, depth: int) -> str:
     return base
 
 
+def spike_mem_arg(base: int = DRAM_BASE, mem_size: int = DRAM_SIZE, *, width: int = 32) -> str:
+    """Spike -m map. RV64 LUI of 0x8xxxx yields 0xffffffff8xxxxxxx — map both views."""
+    low = f"{base:#x}:{mem_size:#x}"
+    if width < 64:
+        return f"-m{low}"
+    hi = 0xFFFFFFFF00000000 | (base & 0xFFFFFFFF)
+    return f"-m{low},{hi:#x}:{mem_size:#x}"
+
+
 def run_spike_retires(
     words: list[int],
     *,
     width: int = 32,
     depth: int = 32,
     max_instructions: int | None = None,
-    base: int = 0x80000000,
+    base: int = DRAM_BASE,
+    mem_size: int = DRAM_SIZE,
 ) -> SpikeResult:
     spike = _find_spike()
     n_insns = max_instructions if max_instructions is not None else max(8, len(words) * 64)
     mask = (1 << width) - 1
+    mem_arg = spike_mem_arg(base, mem_size, width=width)
     with tempfile.TemporaryDirectory(prefix="tinymoa_spike_") as td:
         elf = Path(td) / "prog.elf"
         write_flat_elf(elf, words, base=base, width=width)
@@ -157,7 +121,7 @@ def run_spike_retires(
             spike,
             f"--isa={isa_string(width, depth)}",
             f"--pc={base:#x}",
-            "-m0x80000000:0x200000",
+            mem_arg,
             f"--instructions={n_insns}",
             "-l",
             "--log-commits",
@@ -192,15 +156,42 @@ def compare_spike_to_arch(
     width: int = 32,
     depth: int = 32,
 ) -> None:
+    """Compare Spike commit stream to arch retires.
+
+    On trap_illegal_instruction, Spike stops while the e-core ISS skips illegal
+    ops and continues — compare the committed prefix and require the next word
+    to decode as illegal under the same WIDTH/DEPTH.
+    """
+    from tinymoa_cpu.isa import decode
+
     n = max(len(arch_retires) + 2, 4)
     spike = run_spike_retires(words, width=width, depth=depth, max_instructions=n)
-    got = spike.retires[: len(arch_retires)]
-    if len(got) < len(arch_retires):
-        raise AssertionError(
-            f"spike produced {len(got)} retires, need {len(arch_retires)}\n"
-            f"tail log:\n{spike.log[-1500:]}"
-        )
-    for i, (g, e) in enumerate(zip(got, arch_retires)):
+    got = spike.retires
+    expect = arch_retires
+    if len(got) < len(expect):
+        if "trap_illegal_instruction" not in spike.log:
+            raise AssertionError(
+                f"spike produced {len(got)} retires, need {len(expect)}\n"
+                f"tail log:\n{spike.log[-1500:]}"
+            )
+        # Prefix must match; next program word at arch[len(got)].pc must be illegal.
+        expect = arch_retires[: len(got)]
+        if not got:
+            raise AssertionError(f"spike trapped with no retires\n{spike.log[-1500:]}")
+        next_pc = arch_retires[len(got)].pc if len(arch_retires) > len(got) else None
+        if next_pc is None:
+            raise AssertionError("spike illegal trap but arch has no further retires")
+        idx = next_pc // 4
+        if idx >= len(words):
+            raise AssertionError(f"spike trap pc {next_pc:#x} outside program")
+        dec = decode(words[idx], width=width, reg_num=depth)
+        if not dec.is_illegal:
+            raise AssertionError(
+                f"spike illegal trap at pc={next_pc:#x} but decode is legal "
+                f"(word={words[idx]:#x})\n{spike.log[-800:]}"
+            )
+    got = got[: len(expect)]
+    for i, (g, e) in enumerate(zip(got, expect)):
         if g.pc != e.pc:
             raise AssertionError(f"spike retire[{i}] pc {g.pc:#x} != arch {e.pc:#x}")
         if g.rd != e.rd:

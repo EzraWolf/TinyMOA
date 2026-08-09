@@ -59,4 +59,4 @@ def alu(op: AluOp, a: int, b: int, width: int = 32) -> int:
         return _sext(((a & 0xFFFFFFFF) >> (b & 31)) & 0xFFFFFFFF, 32, width)
     if op == AluOp.SRAW:
         return _sext((_as_signed(a & 0xFFFFFFFF, 32) >> (b & 31)) & 0xFFFFFFFF, 32, width)
-    return 0
+    raise ValueError(f"unknown AluOp: {op!r}")

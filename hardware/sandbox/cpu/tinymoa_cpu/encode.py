@@ -142,24 +142,67 @@ def encode_sltiu(rd, rs1, imm):
     return encode_i_type(imm, rs1, 0x3, rd, 0x13)
 
 
-def encode_slli(rd, rs1, shamt):
-    """I-Type; SLLI rd, rs1, shamt"""
-    return encode_i_type(shamt & 0x1F, rs1, 0x1, rd, 0x13)
+def encode_slli(rd, rs1, shamt, width=32):
+    """I-Type; SLLI rd, rs1, shamt (5-bit shamt on RV32, 6-bit on RV64)."""
+    mask = 0x3F if width >= 64 else 0x1F
+    return encode_i_type(shamt & mask, rs1, 0x1, rd, 0x13)
 
 
-def encode_srli(rd, rs1, shamt):
-    """I-Type; SRLI rd, rs1, shamt"""
-    return encode_i_type(shamt & 0x1F, rs1, 0x5, rd, 0x13)
+def encode_srli(rd, rs1, shamt, width=32):
+    """I-Type; SRLI rd, rs1, shamt (5-bit shamt on RV32, 6-bit on RV64)."""
+    mask = 0x3F if width >= 64 else 0x1F
+    return encode_i_type(shamt & mask, rs1, 0x5, rd, 0x13)
 
 
-def encode_srai(rd, rs1, shamt):
-    """I-Type; SRAI rd, rs1, shamt"""
-    return encode_i_type(0x400 | (shamt & 0x1F), rs1, 0x5, rd, 0x13)
+def encode_srai(rd, rs1, shamt, width=32):
+    """I-Type; SRAI rd, rs1, shamt (funct6/funct7 = 0b010000, shamt in low bits)."""
+    mask = 0x3F if width >= 64 else 0x1F
+    return encode_i_type(0x400 | (shamt & mask), rs1, 0x5, rd, 0x13)
 
 
 def encode_addiw(rd, rs1, imm):
     """I-Type; ADDIW rd, rs1, imm (RV64 OP-IMM-32). Illegal on RV32."""
     return encode_i_type(imm, rs1, 0x0, rd, 0x1B)
+
+
+def encode_slliw(rd, rs1, shamt):
+    """I-Type; SLLIW rd, rs1, shamt (RV64 OP-IMM-32)."""
+    return encode_i_type(shamt & 0x1F, rs1, 0x1, rd, 0x1B)
+
+
+def encode_srliw(rd, rs1, shamt):
+    """I-Type; SRLIW rd, rs1, shamt (RV64 OP-IMM-32)."""
+    return encode_i_type(shamt & 0x1F, rs1, 0x5, rd, 0x1B)
+
+
+def encode_sraiw(rd, rs1, shamt):
+    """I-Type; SRAIW rd, rs1, shamt (RV64 OP-IMM-32)."""
+    return encode_i_type(0x400 | (shamt & 0x1F), rs1, 0x5, rd, 0x1B)
+
+
+def encode_addw(rd, rs1, rs2):
+    """R-Type; ADDW rd, rs1, rs2 (RV64 OP-32)."""
+    return encode_r_type(0x00, rs2, rs1, 0x0, rd, 0x3B)
+
+
+def encode_subw(rd, rs1, rs2):
+    """R-Type; SUBW rd, rs1, rs2 (RV64 OP-32)."""
+    return encode_r_type(0x20, rs2, rs1, 0x0, rd, 0x3B)
+
+
+def encode_sllw(rd, rs1, rs2):
+    """R-Type; SLLW rd, rs1, rs2 (RV64 OP-32)."""
+    return encode_r_type(0x00, rs2, rs1, 0x1, rd, 0x3B)
+
+
+def encode_srlw(rd, rs1, rs2):
+    """R-Type; SRLW rd, rs1, rs2 (RV64 OP-32)."""
+    return encode_r_type(0x00, rs2, rs1, 0x5, rd, 0x3B)
+
+
+def encode_sraw(rd, rs1, rs2):
+    """R-Type; SRAW rd, rs1, rs2 (RV64 OP-32)."""
+    return encode_r_type(0x20, rs2, rs1, 0x5, rd, 0x3B)
 
 
 ### load ops ###
@@ -190,6 +233,16 @@ def encode_lhu(rd, rs1, imm):
     return encode_i_type(imm, rs1, 0x5, rd, 0x03)
 
 
+def encode_ld(rd, rs1, imm):
+    """I-Type; LD rd, imm(rs1) (RV64)."""
+    return encode_i_type(imm, rs1, 0x3, rd, 0x03)
+
+
+def encode_lwu(rd, rs1, imm):
+    """I-Type; LWU rd, imm(rs1) (RV64)."""
+    return encode_i_type(imm, rs1, 0x6, rd, 0x03)
+
+
 ### store ops ###
 
 
@@ -206,6 +259,11 @@ def encode_sh(rs1, rs2, imm):
 def encode_sb(rs1, rs2, imm):
     """S-Type; SB rs2, imm(rs1)"""
     return encode_s_type(imm, rs2, rs1, 0x0, 0x23)
+
+
+def encode_sd(rs1, rs2, imm):
+    """S-Type; SD rs2, imm(rs1) (RV64)."""
+    return encode_s_type(imm, rs2, rs1, 0x3, 0x23)
 
 
 ### jump ops ###
