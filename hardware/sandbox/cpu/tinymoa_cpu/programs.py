@@ -86,27 +86,28 @@ LSU_HALT_PC = (len(LOAD_STORE_PARTIAL) - 1) * 4
 LSU_RESULT = 0x0321B2A1
 
 E_RESULT_ADDR = 0x80006000
+# DEPTH=16: addi/sw involving x16 are illegal → no store. DEPTH=32: store x16==8.
 RV32E_HIGHREG = [
     enc.encode_addi(1, 0, 7),
-    enc.encode_addi(16, 1, 1),
+    enc.encode_addi(16, 1, 1),  # x16 = 8 on I; illegal on E
     enc.encode_lui(2, 0x80006),
-    enc.encode_sw(2, 1, 0),
+    enc.encode_sw(2, 16, 0),  # store x16 — illegal on E (rs2 high); writes 8 on I
     enc.encode_jal(0, 0),
 ]
 E_HALT_PC = (len(RV32E_HIGHREG) - 1) * 4
-E_RESULT = 7
+E_RESULT_E = 0  # no architectural store on RV32E
+E_RESULT_I = 8
 
 W64_RESULT_ADDR = 0x80007000
+W64_RESULT = 5  # addiw x3, x2, 3 with x2=2
 RV64_W = [
-    enc.encode_addi(1, 0, -1),
     enc.encode_addi(2, 0, 2),
-    enc.encode_i_type(3, 2, 0x0, 3, 0x1B),
+    enc.encode_addiw(3, 2, 3),  # RV64 only; illegal on RV32 → x3 stays 0
     enc.encode_lui(4, 0x80007),
     enc.encode_sw(4, 3, 0),
     enc.encode_jal(0, 0),
 ]
 W64_HALT_PC = (len(RV64_W) - 1) * 4
-
 
 def _run_words(words: list[int], halt_pc: int, width: int = 32, depth: int = 32):
     from tinymoa_cpu.top import Core

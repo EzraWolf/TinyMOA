@@ -203,11 +203,9 @@ def compare_spike_to_arch(
     for i, (g, e) in enumerate(zip(got, arch_retires)):
         if g.pc != e.pc:
             raise AssertionError(f"spike retire[{i}] pc {g.pc:#x} != arch {e.pc:#x}")
-        if e.rd is None:
-            continue
         if g.rd != e.rd:
             raise AssertionError(f"spike retire[{i}] rd {g.rd} != arch {e.rd}")
-        if g.value is not None and e.value is not None and g.value != e.value:
+        if g.rd is not None and g.value != e.value:
             raise AssertionError(
                 f"spike retire[{i}] x{e.rd} {g.value:#x} != arch {e.value:#x}"
             )

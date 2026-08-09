@@ -18,12 +18,16 @@ from tinymoa_cpu.mem import IdealMem, imem_from_words
 from tinymoa_cpu.programs import (
     BRANCH_HALT_PC,
     BRANCH_STORM,
+    E_HALT_PC,
     FIBONACCI,
     FIB_HALT_PC,
     LOAD_STORE_PARTIAL,
     LSU_HALT_PC,
     RAW_CHAIN,
     RAW_HALT_PC,
+    RV32E_HIGHREG,
+    RV64_W,
+    W64_HALT_PC,
 )
 from tinymoa_cpu.top import Core, CycleSample
 
@@ -37,6 +41,8 @@ _PROGRAMS = {
     "raw_chain": (RAW_CHAIN, RAW_HALT_PC),
     "branch_storm": (BRANCH_STORM, BRANCH_HALT_PC),
     "load_store_partial": (LOAD_STORE_PARTIAL, LSU_HALT_PC),
+    "rv32e_highreg": (RV32E_HIGHREG, E_HALT_PC),
+    "rv64_w": (RV64_W, W64_HALT_PC),
 }
 
 
@@ -158,6 +164,11 @@ async def cycle_lockstep(dut):
         ),
         pytest.param("fibonacci", FIB_HALT_PC, {"WIDTH": 32, "DEPTH": 16}, id="fib-rv32e"),
         pytest.param("fibonacci", FIB_HALT_PC, {"WIDTH": 64, "DEPTH": 32}, id="fib-rv64i"),
+        pytest.param(
+            "rv32e_highreg", E_HALT_PC, {"WIDTH": 32, "DEPTH": 16}, id="e-highreg-rv32e"
+        ),
+        pytest.param("rv64_w", W64_HALT_PC, {"WIDTH": 64, "DEPTH": 32}, id="addiw-rv64i"),
+        pytest.param("rv64_w", W64_HALT_PC, {"WIDTH": 32, "DEPTH": 32}, id="addiw-illegal-rv32i"),
     ],
 )
 def test_ecore_cycle_lockstep(prog, halt, p):

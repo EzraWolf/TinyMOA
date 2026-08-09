@@ -157,6 +157,11 @@ def encode_srai(rd, rs1, shamt):
     return encode_i_type(0x400 | (shamt & 0x1F), rs1, 0x5, rd, 0x13)
 
 
+def encode_addiw(rd, rs1, imm):
+    """I-Type; ADDIW rd, rs1, imm (RV64 OP-IMM-32). Illegal on RV32."""
+    return encode_i_type(imm, rs1, 0x0, rd, 0x1B)
+
+
 ### load ops ###
 
 
