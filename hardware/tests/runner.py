@@ -6,7 +6,7 @@ import toml
 import logging
 from pathlib import Path
 from xml.etree import ElementTree as ET
-from cocotb_tools.runner import get_runner
+from cocotb_tools.runner import VerilatorControlFile, get_runner
 
 
 def run(
@@ -17,6 +17,7 @@ def run(
     params: dict = {},
     kind: str = "unit",
     extra_env: dict | None = None,
+    build_args: list | None = None,
 ):
     PRJ_DIR = Path(__file__).parents[2].resolve()
     test = "_".join(filter(None, (block, dut, test_name)))
@@ -37,10 +38,14 @@ def run(
 
     toplevel = f"tinymoa_{block}_{dut}"
     module = f"tests.{kind}.{block}.test_{test}"
-    sources = [
-        str(((SRC_DIR if s.startswith("~") else PRJ_DIR) / s.removeprefix("~")))
-        for s in src
-    ]
+    sources = []
+    for s in src:
+        path = str(((SRC_DIR if s.startswith("~") else PRJ_DIR) / s.removeprefix("~")))
+        # cocotb's suffix check for .vlt is broken (compares to "vlt"); tag explicitly
+        if path.endswith(".vlt"):
+            sources.append(VerilatorControlFile(path))
+        else:
+            sources.append(path)
 
     r = get_runner("verilator")
     r.log.addHandler(logging.NullHandler())  # shut up!!
@@ -54,6 +59,7 @@ def run(
             timescale=("1ns", "1ps"),
             build_dir=str(SIM_DIR),
             log_file=str(SIM_DIR / "build.log"),
+            build_args=list(build_args or []),
         )
     except Exception:
         errors = _extract_build_errors(str(SIM_DIR), "build.log")

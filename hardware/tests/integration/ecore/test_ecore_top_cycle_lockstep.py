@@ -58,6 +58,15 @@ def _ecore_sources():
     ]
 
 
+def _regfile_vlt() -> str:
+    # Absolute path; passed as build_args so cocotb does not reorder it ahead of Verilog sources.
+    from pathlib import Path
+
+    return str(
+        Path(__file__).resolve().parents[2] / "common" / "ecore_regfile_public.vlt"
+    )
+
+
 async def _setup(dut, program):
     cocotb.start_soon(Clock(dut.clk, CLOCK_PERIOD_NS, "ns").start())
     instr_mem = load_imem(program)
@@ -70,6 +79,15 @@ async def _setup(dut, program):
     await FallingEdge(dut.clk)
     dut.rst.value = 1
     return instr_mem, data_mem
+
+
+def _sample_rf(dut) -> tuple[int, ...]:
+    """Architectural RF view: x0 hardwired 0; regs[1..] from public_flat_rd storage."""
+    regs = dut.u_decode.u_regfile.regs
+    out = [0]
+    for i in range(1, DEPTH):
+        out.append(int(regs[i].value) & ((1 << WIDTH) - 1))
+    return tuple(out)
 
 
 def _sample_dut(dut, cycle: int) -> CycleSample:
@@ -88,7 +106,7 @@ def _sample_dut(dut, cycle: int) -> CycleSample:
         dmem_wmask=int(dut.o_dmem_wmask.value) if dmem_valid else 0,
         retire_valid=retire_valid,
         retire_pc=int(dut.o_pc.value) if retire_valid else 0,
-        rf=(),  # port-level lockstep; RF via public_flat later
+        rf=_sample_rf(dut),
     )
 
 
@@ -116,7 +134,7 @@ async def cycle_lockstep(dut):
         ref_sample = ref.step()
         dut_sample = _sample_dut(dut, cycle)
 
-        msg = diff_cycle_samples([ref_sample], [dut_sample], check_rf=False)
+        msg = diff_cycle_samples([ref_sample], [dut_sample], check_rf=True)
         if msg:
             raise AssertionError(f"first mismatch at RTL cycle {cycle}: {msg}")
 
@@ -151,4 +169,5 @@ def test_ecore_cycle_lockstep(prog, halt, p):
         params=p,
         kind="integration",
         extra_env={"PROGRAM": prog, "HALT_PC": halt},
+        build_args=[_regfile_vlt()],
     )
