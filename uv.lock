@@ -226,17 +226,21 @@ dev = [
 [[package]]
 name = "tinymoa-cpu-sandbox"
 version = "0.1.0"
-source = { virtual = "hardware/sandbox/cpu" }
+source = { editable = "hardware/sandbox/cpu" }
 
 [package.dev-dependencies]
 dev = [
+    { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.15.15" }]
+dev = [
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "ruff", specifier = ">=0.15.15" },
+]
 
 [[package]]
 name = "tinymoa-lpu-sandbox"
