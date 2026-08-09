@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import cocotb
 from cocotb.clock import Clock
@@ -7,29 +9,31 @@ from tests import CHECK_DELAY_NS, CLOCK_PERIOD_NS
 from tests.common import encode_rv32i as rv32i
 from tests.runner import run
 
+from tinymoa_cpu.cpu import Core
+from tinymoa_cpu.programs import (
+    FIBONACCI,
+    FIB_HALT_PC,
+    FIB_RESULT,
+    FIB_RESULT_ADDR,
+    imem_from_words,
+)
 
-RESULT_ADDR = 0x100
-RESULT = 55
+
+RESULT_ADDR = FIB_RESULT_ADDR
+RESULT = FIB_RESULT
 CYCLE_TIMEOUT = 500
 
-PROGRAM = [
-    rv32i.encode_addi(5, 0, 10),  # addi t0, zero, 10
-    rv32i.encode_addi(6, 0, 0),  # addi t1, zero, 0
-    rv32i.encode_addi(7, 0, 1),  # addi t2, zero, 1
-    rv32i.encode_beq(5, 0, 24),  # beq  t0, zero, done
-    rv32i.encode_add(8, 6, 7),  # add  s0, t1, t2
-    rv32i.encode_addi(6, 7, 0),  # addi t1, t2, 0
-    rv32i.encode_addi(7, 8, 0),  # addi t2, s0, 0
-    rv32i.encode_addi(5, 5, -1),  # addi t0, t0, -1
-    rv32i.encode_jal(0, -20),  # jal  zero, loop
-    rv32i.encode_addi(9, 0, 0x100),  # addi s1, zero, 0x100
-    rv32i.encode_sw(9, 6, 0),  # sw   t1, 0(s1)
-    rv32i.encode_jal(0, 0),  # halt: jal zero, halt
-]
+PROGRAM = list(FIBONACCI)
 
 
 def _load_program(program):
     return {i * 4: instr for i, instr in enumerate(program)}
+
+
+def _sandbox_fib(width: int, depth: int):
+    return Core(width=width, depth=depth, imem=imem_from_words(PROGRAM)).run(
+        halt_pc=FIB_HALT_PC
+    )
 
 
 async def setup(dut, program):
@@ -49,7 +53,7 @@ async def setup(dut, program):
 
 
 async def run_until_halt(dut, instr_mem, data_mem, halt_pc):
-    for _ in range(CYCLE_TIMEOUT):
+    for cycle in range(CYCLE_TIMEOUT):
         await FallingEdge(dut.clk)
 
         if dut.o_dmem_valid.value:
@@ -72,7 +76,7 @@ async def run_until_halt(dut, instr_mem, data_mem, halt_pc):
 
         await Timer(CHECK_DELAY_NS, "ns")
         if dut.o_valid.value and dut.o_pc.value == halt_pc:
-            return
+            return cycle + 1
 
     raise AssertionError(f"timeout after {CYCLE_TIMEOUT} cycles")
 
@@ -80,8 +84,13 @@ async def run_until_halt(dut, instr_mem, data_mem, halt_pc):
 @cocotb.test()
 async def fibonacci(dut):
     instr_mem, data_mem = await setup(dut, PROGRAM)
-    await run_until_halt(dut, instr_mem, data_mem, halt_pc=(len(PROGRAM) - 1) * 4)
+    cycles = await run_until_halt(dut, instr_mem, data_mem, halt_pc=FIB_HALT_PC)
     assert data_mem.get(RESULT_ADDR, 0) == RESULT
+
+    # Live lockstep vs sandbox (expected cycles exported by pytest wrapper)
+    expect = int(os.environ["SANDBOX_FIB_CYCLES"])
+    assert cycles == expect, f"RTL cycles {cycles} != sandbox {expect}"
+    assert data_mem.get(RESULT_ADDR, 0) == int(os.environ["SANDBOX_FIB_RESULT"])
 
 
 @pytest.mark.parametrize(
@@ -94,6 +103,11 @@ async def fibonacci(dut):
     ],
 )
 def test_ecore_top_fibonacci(p):
+    ref = _sandbox_fib(width=p["WIDTH"], depth=p["DEPTH"])
+    assert ref.dmem.get(RESULT_ADDR, 0) == RESULT
+    os.environ["SANDBOX_FIB_CYCLES"] = str(ref.cycles)
+    os.environ["SANDBOX_FIB_RESULT"] = str(ref.dmem[RESULT_ADDR])
+
     run(
         "ecore",
         "top",
