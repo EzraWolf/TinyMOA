@@ -1,5 +1,3 @@
-import os
-
 import pytest
 import cocotb
 from cocotb.clock import Clock
@@ -9,13 +7,12 @@ from tests import CHECK_DELAY_NS, CLOCK_PERIOD_NS
 from tests.common import encode_rv32i as rv32i
 from tests.runner import run
 
-from tinymoa_cpu.cpu import Core
 from tinymoa_cpu.programs import (
     FIBONACCI,
     FIB_HALT_PC,
     FIB_RESULT,
     FIB_RESULT_ADDR,
-    imem_from_words,
+    run_fibonacci,
 )
 
 
@@ -28,12 +25,6 @@ PROGRAM = list(FIBONACCI)
 
 def _load_program(program):
     return {i * 4: instr for i, instr in enumerate(program)}
-
-
-def _sandbox_fib(width: int, depth: int):
-    return Core(width=width, depth=depth, imem=imem_from_words(PROGRAM)).run(
-        halt_pc=FIB_HALT_PC
-    )
 
 
 async def setup(dut, program):
@@ -65,7 +56,7 @@ async def run_until_halt(dut, instr_mem, data_mem, halt_pc):
                 for i in range(4):
                     if mask & (1 << i):
                         word &= ~(0xFF << (i * 8))
-                        word |= data & (0xFF << (i * 8))
+                        word |= ((data >> (i * 8)) & 0xFF) << (i * 8)
                 data_mem[addr] = word
 
             if dut.o_dmem_ren.value:
@@ -83,14 +74,21 @@ async def run_until_halt(dut, instr_mem, data_mem, halt_pc):
 
 @cocotb.test()
 async def fibonacci(dut):
+    # Recompute sandbox expectation inside the sim process (no env-var coupling).
+    width = len(dut.o_pc)
+    try:
+        depth = int(dut.DEPTH.value)
+    except Exception:
+        depth = 32
+
+    ref = run_fibonacci(width=width, depth=depth)
+
     instr_mem, data_mem = await setup(dut, PROGRAM)
     cycles = await run_until_halt(dut, instr_mem, data_mem, halt_pc=FIB_HALT_PC)
-    assert data_mem.get(RESULT_ADDR, 0) == RESULT
 
-    # Live lockstep vs sandbox (expected cycles exported by pytest wrapper)
-    expect = int(os.environ["SANDBOX_FIB_CYCLES"])
-    assert cycles == expect, f"RTL cycles {cycles} != sandbox {expect}"
-    assert data_mem.get(RESULT_ADDR, 0) == int(os.environ["SANDBOX_FIB_RESULT"])
+    assert data_mem.get(RESULT_ADDR, 0) == RESULT
+    assert data_mem.get(RESULT_ADDR, 0) == ref.dmem.get(RESULT_ADDR, 0)
+    assert cycles == ref.cycles, f"RTL cycles {cycles} != sandbox {ref.cycles}"
 
 
 @pytest.mark.parametrize(
@@ -103,10 +101,9 @@ async def fibonacci(dut):
     ],
 )
 def test_ecore_top_fibonacci(p):
-    ref = _sandbox_fib(width=p["WIDTH"], depth=p["DEPTH"])
+    # Sanity before launching Verilator: sandbox itself must pass the contract.
+    ref = run_fibonacci(width=p["WIDTH"], depth=p["DEPTH"])
     assert ref.dmem.get(RESULT_ADDR, 0) == RESULT
-    os.environ["SANDBOX_FIB_CYCLES"] = str(ref.cycles)
-    os.environ["SANDBOX_FIB_RESULT"] = str(ref.dmem[RESULT_ADDR])
 
     run(
         "ecore",
