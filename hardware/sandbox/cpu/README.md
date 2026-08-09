@@ -10,6 +10,6 @@ Layout mirrors the RTL:
 
 ```bash
 uv sync --all-packages
-uv run pytest hardware/sandbox/cpu/tests -q
+uv run pytest hardware/tests/unit/sandbox -q
 uv run pytest -k test_ecore_top_fibonacci -q   # live lockstep vs Verilator RTL
 ```

@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import cocotb
 from cocotb.clock import Clock
@@ -21,6 +23,10 @@ RESULT = FIB_RESULT
 CYCLE_TIMEOUT = 500
 
 PROGRAM = list(FIBONACCI)
+
+# Elaboration params from runner.extra_env (same pattern as unit ecore tests)
+WIDTH = int(os.environ.get("WIDTH", "32"))
+DEPTH = int(os.environ.get("DEPTH", "32"))
 
 
 def _load_program(program):
@@ -74,14 +80,10 @@ async def run_until_halt(dut, instr_mem, data_mem, halt_pc):
 
 @cocotb.test()
 async def fibonacci(dut):
-    # Recompute sandbox expectation inside the sim process (no env-var coupling).
-    width = len(dut.o_pc)
-    try:
-        depth = int(dut.DEPTH.value)
-    except Exception:
-        depth = 32
+    # Cross-check elaborated WIDTH against a real DUT port (catches env/DUT skew).
+    assert len(dut.o_pc) == WIDTH, f"DUT o_pc width {len(dut.o_pc)} != WIDTH={WIDTH}"
 
-    ref = run_fibonacci(width=width, depth=depth)
+    ref = run_fibonacci(width=WIDTH, depth=DEPTH)
 
     instr_mem, data_mem = await setup(dut, PROGRAM)
     cycles = await run_until_halt(dut, instr_mem, data_mem, halt_pc=FIB_HALT_PC)
@@ -101,7 +103,6 @@ async def fibonacci(dut):
     ],
 )
 def test_ecore_top_fibonacci(p):
-    # Sanity before launching Verilator: sandbox itself must pass the contract.
     ref = run_fibonacci(width=p["WIDTH"], depth=p["DEPTH"])
     assert ref.dmem.get(RESULT_ADDR, 0) == RESULT
 
