@@ -1,84 +1,139 @@
-"""
-Shared programs for sandbox + RTL lockstep.
-
-Instruction words must stay byte-identical to `tests.common.encode_rv32i`
-encodings (enforced by `tests/test_sandbox.py`).
-"""
+"""Directed programs for sandbox + RTL lockstep (built via tinymoa_cpu.encode)."""
 
 from __future__ import annotations
 
-
-def _r(funct7, rs2, rs1, funct3, rd, opcode):
-    return (funct7 << 25) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | opcode
-
-
-def _i(imm, rs1, funct3, rd, opcode):
-    return ((imm & 0xFFF) << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | opcode
+from tinymoa_cpu import encode as enc
+from tinymoa_cpu.mem import IdealMem, imem_from_words  # noqa: F401 — re-exported
 
 
-def _s(imm, rs2, rs1, funct3, opcode):
-    return (
-        (((imm >> 5) & 0x7F) << 25)
-        | (rs2 << 20)
-        | (rs1 << 15)
-        | (funct3 << 12)
-        | ((imm & 0x1F) << 7)
-        | opcode
-    )
+def xlen_addr(addr: int, width: int) -> int:
+    """Canonical XLEN address for a 32-bit lui-built pointer (RV64 sign-extends bit 31)."""
+    addr &= 0xFFFFFFFF
+    if width > 32 and (addr & 0x80000000):
+        return addr | (((1 << width) - 1) ^ 0xFFFFFFFF)
+    return addr
 
 
-def _b(imm, rs2, rs1, funct3, opcode):
-    return (
-        (((imm >> 12) & 1) << 31)
-        | (((imm >> 5) & 0x3F) << 25)
-        | (rs2 << 20)
-        | (rs1 << 15)
-        | (funct3 << 12)
-        | (((imm >> 1) & 0xF) << 8)
-        | (((imm >> 11) & 1) << 7)
-        | opcode
-    )
-
-
-def _j(imm, rd, opcode):
-    return (
-        (((imm >> 20) & 1) << 31)
-        | (((imm >> 1) & 0x3FF) << 21)
-        | (((imm >> 11) & 1) << 20)
-        | (((imm >> 12) & 0xFF) << 12)
-        | (rd << 7)
-        | opcode
-    )
-
-
-FIB_RESULT_ADDR = 0x100
+# Keep data in the Spike DRAM window at 0x80000000 so arch/spike/RTL share one image.
+FIB_RESULT_ADDR = 0x80001000
 FIB_RESULT = 55
 
 FIBONACCI = [
-    _i(10, 0, 0x0, 5, 0x13),  # addi t0, zero, 10
-    _i(0, 0, 0x0, 6, 0x13),  # addi t1, zero, 0
-    _i(1, 0, 0x0, 7, 0x13),  # addi t2, zero, 1
-    _b(24, 0, 5, 0x0, 0x63),  # beq  t0, zero, done
-    _r(0x00, 7, 6, 0x0, 8, 0x33),  # add  s0, t1, t2
-    _i(0, 7, 0x0, 6, 0x13),  # addi t1, t2, 0
-    _i(0, 8, 0x0, 7, 0x13),  # addi t2, s0, 0
-    _i(-1 & 0xFFF, 5, 0x0, 5, 0x13),  # addi t0, t0, -1
-    _j(-20, 0, 0x6F),  # jal  zero, loop
-    _i(0x100, 0, 0x0, 9, 0x13),  # addi s1, zero, 0x100
-    _s(0, 6, 9, 0x2, 0x23),  # sw   t1, 0(s1)
-    _j(0, 0, 0x6F),  # halt
+    enc.encode_addi(5, 0, 10),
+    enc.encode_addi(6, 0, 0),
+    enc.encode_addi(7, 0, 1),
+    enc.encode_beq(5, 0, 24),
+    enc.encode_add(8, 6, 7),
+    enc.encode_addi(6, 7, 0),
+    enc.encode_addi(7, 8, 0),
+    enc.encode_addi(5, 5, -1),
+    enc.encode_jal(0, -20),
+    enc.encode_lui(9, 0x80001),  # 0x80001000
+    enc.encode_sw(9, 6, 0),
+    enc.encode_jal(0, 0),
 ]
 
 FIB_HALT_PC = (len(FIBONACCI) - 1) * 4
 
+RAW_RESULT_ADDR = 0x80002000
+RAW_CHAIN = [
+    enc.encode_addi(1, 0, 1),
+    enc.encode_addi(2, 1, 1),
+    enc.encode_addi(3, 2, 1),
+    enc.encode_addi(4, 3, 1),
+    enc.encode_addi(5, 4, 1),
+    enc.encode_lui(6, 0x80002),
+    enc.encode_sw(6, 5, 0),
+    enc.encode_jal(0, 0),
+]
+RAW_HALT_PC = (len(RAW_CHAIN) - 1) * 4
+RAW_RESULT = 5
 
-def imem_from_words(words: list[int]) -> dict[int, int]:
-    return {i * 4: w & 0xFFFFFFFF for i, w in enumerate(words)}
+BRANCH_RESULT_ADDR = 0x80003000
+BRANCH_STORM = [
+    enc.encode_addi(1, 0, 3),
+    enc.encode_addi(2, 0, 0),
+    enc.encode_beq(1, 0, 12),
+    enc.encode_addi(2, 2, 1),
+    enc.encode_bne(1, 0, 8),
+    enc.encode_addi(2, 2, 7),
+    enc.encode_addi(2, 2, 1),
+    enc.encode_blt(0, 1, 8),
+    enc.encode_addi(2, 2, 7),
+    enc.encode_addi(2, 2, 1),
+    enc.encode_lui(3, 0x80003),
+    enc.encode_sw(3, 2, 0),
+    enc.encode_jal(0, 0),
+]
+BRANCH_HALT_PC = (len(BRANCH_STORM) - 1) * 4
+BRANCH_RESULT = 3
+
+LSU_RESULT_ADDR = 0x80005000
+LOAD_STORE_PARTIAL = [
+    enc.encode_lui(1, 0x80004),  # scratch 0x80004000
+    enc.encode_addi(2, 0, 0xA1),
+    enc.encode_addi(3, 0, 0xB2),
+    enc.encode_sb(1, 2, 0),
+    enc.encode_sb(1, 3, 1),
+    enc.encode_addi(4, 0, 0x321),
+    enc.encode_sh(1, 4, 2),
+    enc.encode_lw(5, 1, 0),
+    enc.encode_lui(6, 0x80005),
+    enc.encode_sw(6, 5, 0),
+    enc.encode_jal(0, 0),
+]
+LSU_HALT_PC = (len(LOAD_STORE_PARTIAL) - 1) * 4
+LSU_RESULT = 0x0321B2A1
+
+E_RESULT_ADDR = 0x80006000
+RV32E_HIGHREG = [
+    enc.encode_addi(1, 0, 7),
+    enc.encode_addi(16, 1, 1),
+    enc.encode_lui(2, 0x80006),
+    enc.encode_sw(2, 1, 0),
+    enc.encode_jal(0, 0),
+]
+E_HALT_PC = (len(RV32E_HIGHREG) - 1) * 4
+E_RESULT = 7
+
+W64_RESULT_ADDR = 0x80007000
+RV64_W = [
+    enc.encode_addi(1, 0, -1),
+    enc.encode_addi(2, 0, 2),
+    enc.encode_i_type(3, 2, 0x0, 3, 0x1B),
+    enc.encode_lui(4, 0x80007),
+    enc.encode_sw(4, 3, 0),
+    enc.encode_jal(0, 0),
+]
+W64_HALT_PC = (len(RV64_W) - 1) * 4
+
+
+def _run_words(words: list[int], halt_pc: int, width: int = 32, depth: int = 32):
+    from tinymoa_cpu.top import Core
+
+    mem = IdealMem(imem=imem_from_words(words))
+    return Core(width=width, depth=depth, mem=mem).run(halt_pc=halt_pc)
 
 
 def run_fibonacci(width: int = 32, depth: int = 32):
-    from tinymoa_cpu.top import Core
+    return _run_words(FIBONACCI, FIB_HALT_PC, width, depth)
 
-    return Core(width=width, depth=depth, imem=imem_from_words(FIBONACCI)).run(
-        halt_pc=FIB_HALT_PC
-    )
+
+def run_raw_chain(width: int = 32, depth: int = 32):
+    return _run_words(RAW_CHAIN, RAW_HALT_PC, width, depth)
+
+
+def run_branch_storm(width: int = 32, depth: int = 32):
+    return _run_words(BRANCH_STORM, BRANCH_HALT_PC, width, depth)
+
+
+def run_load_store_partial(width: int = 32, depth: int = 32):
+    return _run_words(LOAD_STORE_PARTIAL, LSU_HALT_PC, width, depth)
+
+
+def run_rv32e_highreg(width: int = 32, depth: int = 16):
+    return _run_words(RV32E_HIGHREG, E_HALT_PC, width, depth)
+
+
+def run_rv64_w(width: int = 64, depth: int = 32):
+    return _run_words(RV64_W, W64_HALT_PC, width, depth)

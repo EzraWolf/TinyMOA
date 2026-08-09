@@ -7,8 +7,10 @@ from dataclasses import dataclass, field
 from tinymoa_cpu.alu import alu
 from tinymoa_cpu.bru import bru
 from tinymoa_cpu.isa import decode
-from tinymoa_cpu.lsu import apply_store, lsu
+from tinymoa_cpu.lsu import lsu
+from tinymoa_cpu.mem import IdealMem
 from tinymoa_cpu.regfile import RegFile
+from tinymoa_cpu.top import RetireEvent
 from tinymoa_cpu.types import FuSrc1, FuSrc2, WbSel
 
 
@@ -18,19 +20,28 @@ class ArchResult:
     dmem: dict[int, int]
     regs: list[int]
     stores: list[tuple[int, int, int]]
+    retires: list[RetireEvent] = field(default_factory=list)
 
 
 @dataclass
 class ArchCore:
     width: int = 32
     depth: int = 32
-    imem: dict[int, int] = field(default_factory=dict)
-    dmem: dict[int, int] = field(default_factory=dict)
+    mem: IdealMem = field(default_factory=IdealMem)
+    imem: dict[int, int] | None = None
+    dmem: dict[int, int] | None = None
     pc: int = 0
     cycles: int = 0
     stores: list[tuple[int, int, int]] = field(default_factory=list)
+    retires: list[RetireEvent] = field(default_factory=list)
 
     def __post_init__(self) -> None:
+        if self.imem is not None or self.dmem is not None:
+            self.mem = IdealMem(
+                imem=dict(self.imem or self.mem.imem),
+                dmem=dict(self.dmem or self.mem.dmem),
+                fill_instr=self.mem.fill_instr,
+            )
         self._mask = (1 << self.width) - 1
         self.rf = RegFile(self.width, self.depth)
 
@@ -40,7 +51,7 @@ class ArchCore:
         return imm32 & self._mask
 
     def step(self) -> bool:
-        instr = self.imem.get(self.pc, 0x0000006F)
+        instr = self.mem.imem_read(self.pc)
         dec = decode(instr, width=self.width, reg_num=self.depth)
         pc = self.pc
         next_pc = (pc + 4) & self._mask
@@ -63,10 +74,10 @@ class ArchCore:
         store_data = self.rf.read(dec.rf_src2)
 
         if dec.mem_ren or dec.mem_wen:
-            bus_word = self.dmem.get(fu & ~((self.width // 8) - 1), 0)
+            bus_word = self.mem.dmem_read(fu & ~((self.width // 8) - 1))
             res = lsu(fu, store_data, dec.funct3, dec.mem_ren, dec.mem_wen, bus_word, self.width)
             if dec.mem_wen and not res.error:
-                apply_store(self.dmem, res.bus_addr, res.wdata, res.wmask, self.width)
+                self.mem.dmem_store(res.bus_addr, res.wdata, res.wmask, self.width)
                 self.stores.append((res.bus_addr, res.wdata, res.wmask))
             load_data = res.load_data
             mem_error = res.error
@@ -75,13 +86,22 @@ class ArchCore:
             mem_error = False
 
         exception = dec.is_ecall or dec.is_ebreak or dec.is_illegal or mem_error
+        rd: int | None = None
+        val: int | None = None
         if dec.rf_wen and not exception:
             if dec.wb_sel == WbSel.FU:
-                self.rf.write(dec.rf_dst, fu)
+                val = fu & self._mask
             elif dec.wb_sel == WbSel.PC:
-                self.rf.write(dec.rf_dst, next_pc)
+                val = next_pc
             elif dec.wb_sel == WbSel.MEM:
-                self.rf.write(dec.rf_dst, load_data)
+                val = load_data & self._mask
+            if val is not None and dec.rf_dst != 0:
+                self.rf.write(dec.rf_dst, val)
+                rd = dec.rf_dst
+            elif val is not None and dec.rf_dst == 0:
+                # x0 write is architecturally a no-op; Spike omits it from commit log
+                pass
+        self.retires.append(RetireEvent(pc, rd, val if rd is not None else None))
 
         if dec.is_jump:
             next_pc = (fu & ~1) & self._mask
@@ -103,7 +123,8 @@ class ArchCore:
             raise TimeoutError(f"arch ISS exceeded {max_steps} steps")
         return ArchResult(
             cycles=self.cycles,
-            dmem=dict(self.dmem),
+            dmem=dict(self.mem.dmem),
             regs=self.rf.snapshot(),
             stores=list(self.stores),
+            retires=list(self.retires),
         )

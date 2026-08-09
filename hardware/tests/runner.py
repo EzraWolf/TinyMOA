@@ -16,6 +16,7 @@ def run(
     test_name: str = "",
     params: dict = {},
     kind: str = "unit",
+    extra_env: dict | None = None,
 ):
     PRJ_DIR = Path(__file__).parents[2].resolve()
     test = "_".join(filter(None, (block, dut, test_name)))
@@ -58,6 +59,10 @@ def run(
         errors = _extract_build_errors(str(SIM_DIR), "build.log")
         raise AssertionError("\n".join(errors)) from None
 
+    env = {k: str(v) for k, v in params.items()}
+    if extra_env:
+        env.update({k: str(v) for k, v in extra_env.items()})
+
     try:
         r.test(
             hdl_toplevel=toplevel,
@@ -68,7 +73,7 @@ def run(
             test_dir=str(SIM_DIR),
             log_file=str(SIM_DIR / "test.log"),
             # waves=True,
-            extra_env={k: str(v) for k, v in params.items()},
+            extra_env=env,
         )
     except SystemExit:
         failures = _extract_failure_trace(str(SIM_DIR))
