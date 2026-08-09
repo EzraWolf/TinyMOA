@@ -1,41 +1,40 @@
+"""Live ecore_top fibonacci: sandbox cycle count + dmem vs Verilator."""
+
+import os
+
 import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, Timer
 
 from tests import CHECK_DELAY_NS, CLOCK_PERIOD_NS
-from tests.common import encode_rv32i as rv32i
+from tests.common.ideal_mem_tb import drive_imem, load_imem, service_dmem
 from tests.runner import run
 
+from tinymoa_cpu.programs import (
+    FIBONACCI,
+    FIB_HALT_PC,
+    FIB_RESULT,
+    FIB_RESULT_ADDR,
+    run_fibonacci,
+    xlen_addr,
+)
 
-RESULT_ADDR = 0x100
-RESULT = 55
+
+RESULT = FIB_RESULT
 CYCLE_TIMEOUT = 500
 
-PROGRAM = [
-    rv32i.encode_addi(5, 0, 10),  # addi t0, zero, 10
-    rv32i.encode_addi(6, 0, 0),  # addi t1, zero, 0
-    rv32i.encode_addi(7, 0, 1),  # addi t2, zero, 1
-    rv32i.encode_beq(5, 0, 24),  # beq  t0, zero, done
-    rv32i.encode_add(8, 6, 7),  # add  s0, t1, t2
-    rv32i.encode_addi(6, 7, 0),  # addi t1, t2, 0
-    rv32i.encode_addi(7, 8, 0),  # addi t2, s0, 0
-    rv32i.encode_addi(5, 5, -1),  # addi t0, t0, -1
-    rv32i.encode_jal(0, -20),  # jal  zero, loop
-    rv32i.encode_addi(9, 0, 0x100),  # addi s1, zero, 0x100
-    rv32i.encode_sw(9, 6, 0),  # sw   t1, 0(s1)
-    rv32i.encode_jal(0, 0),  # halt: jal zero, halt
-]
+PROGRAM = list(FIBONACCI)
 
-
-def _load_program(program):
-    return {i * 4: instr for i, instr in enumerate(program)}
+WIDTH = int(os.environ.get("WIDTH", "32"))
+DEPTH = int(os.environ.get("DEPTH", "32"))
+RESULT_ADDR = xlen_addr(FIB_RESULT_ADDR, WIDTH)
 
 
 async def setup(dut, program):
     cocotb.start_soon(Clock(dut.clk, CLOCK_PERIOD_NS, "ns").start())
 
-    instr_mem = _load_program(program)
+    instr_mem = load_imem(program)
     data_mem = {}
     dut.rst.value = 0
     dut.i_imem_ready.value = 1
@@ -49,39 +48,28 @@ async def setup(dut, program):
 
 
 async def run_until_halt(dut, instr_mem, data_mem, halt_pc):
-    for _ in range(CYCLE_TIMEOUT):
+    for cycle in range(CYCLE_TIMEOUT):
         await FallingEdge(dut.clk)
-
-        if dut.o_dmem_valid.value:
-            addr = int(dut.o_dmem_addr.value)
-            if dut.o_dmem_wen.value:
-                data = int(dut.o_dmem_wdata.value)
-                mask = int(dut.o_dmem_wmask.value)
-                word = data_mem.get(addr, 0)
-                for i in range(4):
-                    if mask & (1 << i):
-                        word &= ~(0xFF << (i * 8))
-                        word |= data & (0xFF << (i * 8))
-                data_mem[addr] = word
-
-            if dut.o_dmem_ren.value:
-                dut.i_dmem_rdata.value = data_mem.get(addr, 0)
-
-        pc = int(dut.o_imem_addr.value)
-        dut.i_imem_rdata.value = instr_mem.get(pc, rv32i.encode_jal(0, 0))
-
+        service_dmem(dut, data_mem, width=WIDTH)
+        drive_imem(dut, instr_mem)
         await Timer(CHECK_DELAY_NS, "ns")
-        if dut.o_valid.value and dut.o_pc.value == halt_pc:
-            return
-
+        if dut.o_valid.value and int(dut.o_pc.value) == halt_pc:
+            return cycle + 1
     raise AssertionError(f"timeout after {CYCLE_TIMEOUT} cycles")
 
 
 @cocotb.test()
 async def fibonacci(dut):
+    assert len(dut.o_pc) == WIDTH, f"DUT o_pc width {len(dut.o_pc)} != WIDTH={WIDTH}"
+
+    ref = run_fibonacci(width=WIDTH, depth=DEPTH)
+
     instr_mem, data_mem = await setup(dut, PROGRAM)
-    await run_until_halt(dut, instr_mem, data_mem, halt_pc=(len(PROGRAM) - 1) * 4)
+    cycles = await run_until_halt(dut, instr_mem, data_mem, halt_pc=FIB_HALT_PC)
+
     assert data_mem.get(RESULT_ADDR, 0) == RESULT
+    assert data_mem.get(RESULT_ADDR, 0) == ref.dmem.get(RESULT_ADDR, 0)
+    assert cycles == ref.cycles, f"RTL cycles {cycles} != sandbox {ref.cycles}"
 
 
 @pytest.mark.parametrize(
@@ -94,6 +82,10 @@ async def fibonacci(dut):
     ],
 )
 def test_ecore_top_fibonacci(p):
+    result_addr = xlen_addr(FIB_RESULT_ADDR, p["WIDTH"])
+    ref = run_fibonacci(width=p["WIDTH"], depth=p["DEPTH"])
+    assert ref.dmem.get(result_addr, 0) == RESULT
+
     run(
         "ecore",
         "top",
